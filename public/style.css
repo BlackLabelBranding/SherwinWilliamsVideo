@@ -7,6 +7,20 @@ body {
   color: #333;
 }
 
+/* Branding Styles */
+.logo {
+  display: block;
+  margin: 20px auto;
+  width: 120px;
+  height: auto;
+}
+
+.banner {
+  width: 100%;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
 .container {
   max-width: 600px;
   margin: 0 auto;

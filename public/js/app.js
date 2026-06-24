@@ -60,6 +60,7 @@ async function postComment(body) {
 
 function renderLogin() {
   app.innerHTML = `
+    <img src="/images/logo.png" alt="Sherwin-Williams logo" class="logo" />
     <h1>Log In</h1>
     <form id="login-form">
       <input type="text" id="username" placeholder="Username" required />
@@ -85,6 +86,7 @@ function renderLogin() {
 
 function renderLive() {
   app.innerHTML = `
+    <img src="/images/banner.jpeg" alt="Sherwin-Williams banner" class="banner" />
     <h1>Live Stream</h1>
     <div class="video-container">
       <video id="live-video" controls autoplay muted></video>

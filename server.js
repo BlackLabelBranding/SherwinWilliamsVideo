@@ -14,6 +14,21 @@ const users = [
 let sessions = {};
 let comments = [];
 
+// Live stream status (demo values). Set `isLiveStreamActive` to true when a live stream is available.
+let isLiveStreamActive = false;
+let liveStreamURL = 'https://example.com/your-live-stream.m3u8';
+
+// Archive videos and comments (demo data). Replace or extend these arrays with real archive entries.
+let archiveVideos = [
+  {
+    id: '1',
+    title: 'Q1 Driver Meeting',
+    url: 'https://example.com/archive1.m3u8'
+  }
+];
+
+let archiveComments = {};
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -65,6 +80,42 @@ app.post('/api/logout', authenticate, (req, res) => {
   const token = req.headers['authorization'];
   delete sessions[token];
   res.json({ success: true });
+});
+
+// Endpoint to fetch live stream status and playback URL
+app.get('/api/is-live', authenticate, (req, res) => {
+  res.json({ isLive: isLiveStreamActive, url: liveStreamURL });
+});
+
+// Archive video list
+app.get('/api/archive-videos', authenticate, (req, res) => {
+  res.json(archiveVideos);
+});
+
+// Get comments for a specific archive video
+app.get('/api/archive-comments/:id', authenticate, (req, res) => {
+  const id = req.params.id;
+  res.json(archiveComments[id] || []);
+});
+
+// Post a comment on a specific archive video
+app.post('/api/archive-comments/:id', authenticate, (req, res) => {
+  const id = req.params.id;
+  const { body } = req.body;
+  if (!body || !body.trim()) {
+    return res.status(400).json({ success: false, message: 'Comment body required' });
+  }
+  const comment = {
+    id: uuidv4(),
+    username: req.user.username,
+    body: body.trim(),
+    timestamp: Date.now()
+  };
+  if (!archiveComments[id]) {
+    archiveComments[id] = [];
+  }
+  archiveComments[id].push(comment);
+  res.json({ success: true, comment });
 });
 
 // Serve the app

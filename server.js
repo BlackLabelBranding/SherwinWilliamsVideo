@@ -14,9 +14,12 @@ const users = [
 let sessions = {};
 let comments = [];
 
-// Live stream status (demo values). Set `isLiveStreamActive` to true when a live stream is available.
-let isLiveStreamActive = false;
-let liveStreamURL = 'https://example.com/your-live-stream.m3u8';
+// Live stream status. Set `isLiveStreamActive` to true when a live stream is available.
+// Use the Supabase-signed URL for the current live test video. When this link expires
+// or you have a new live stream, update `liveStreamURL` accordingly and set
+// `isLiveStreamActive` to true.
+let isLiveStreamActive = true;
+let liveStreamURL = 'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ';
 
 // Archive videos and comments (demo data). Replace or extend these arrays with real archive entries.
 let archiveVideos = [
@@ -24,6 +27,11 @@ let archiveVideos = [
     id: '1',
     title: 'Q1 Driver Meeting',
     url: 'https://example.com/archive1.m3u8'
+  },
+  {
+    id: '2',
+    title: 'Supabase Test Video',
+    url: 'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ'
   }
 ];
 

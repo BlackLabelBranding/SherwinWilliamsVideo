@@ -12,6 +12,8 @@ const CONFIG = {
     isLive: true,
     title: 'Sherwin-Williams Driver Live Stream',
     subtitle: 'Quarterly Driver Broadcast',
+    // Replace this with the Amazon IVS Playback URL when the real live channel is ready.
+    // Example format: https://xxxxxxxx.us-west-2.playback.live-video.net/api/video/v1/...
     url:
       'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ',
     type: 'video/quicktime'
@@ -27,6 +29,8 @@ const CONFIG = {
     }
   ]
 };
+
+window.swPlayers = window.swPlayers || {};
 
 function getToken() {
   return localStorage.getItem('sw_session_token');
@@ -80,6 +84,7 @@ function login(username, password) {
 
 function logout() {
   clearToken();
+  destroyPlayers();
   renderLogin();
 }
 
@@ -110,6 +115,7 @@ function renderHeader() {
 }
 
 function renderLogin() {
+  destroyPlayers();
   app.innerHTML = `
     <main class="login-page">
       <section class="login-card">
@@ -143,18 +149,73 @@ function renderLogin() {
   });
 }
 
+function isIvsPlaybackUrl(url) {
+  return url.includes('playback.live-video.net') || url.includes('.m3u8');
+}
+
+function destroyPlayers() {
+  Object.values(window.swPlayers || {}).forEach((player) => {
+    try {
+      player.pause?.();
+      player.delete?.();
+    } catch (error) {
+      console.warn('Could not destroy player', error);
+    }
+  });
+  window.swPlayers = {};
+}
+
 function renderVideo(video, idPrefix) {
   return `
     <div class="video-shell">
-      <video id="${idPrefix}-video" controls playsinline preload="metadata">
-        <source src="${video.url}" type="${video.type || 'video/mp4'}" />
+      <video id="${idPrefix}-video" controls playsinline preload="metadata" ${idPrefix === 'live' ? 'muted' : ''}>
         Your browser does not support this video format.
       </video>
     </div>
-    <p class="video-note">
-      If the video area loads but the file will not play, upload an MP4 version to Supabase and replace the URL.
+    <p class="video-note" id="${idPrefix}-video-note">
+      ${isIvsPlaybackUrl(video.url) ? 'Connected to Amazon IVS playback.' : 'Test file loaded from Supabase. If it does not play, upload an MP4 version.'}
     </p>
   `;
+}
+
+function initVideoPlayer(video, idPrefix) {
+  const videoElement = document.getElementById(`${idPrefix}-video`);
+  const noteElement = document.getElementById(`${idPrefix}-video-note`);
+  if (!videoElement) return;
+
+  if (window.swPlayers?.[idPrefix]) {
+    try {
+      window.swPlayers[idPrefix].pause?.();
+      window.swPlayers[idPrefix].delete?.();
+    } catch (error) {
+      console.warn('Could not reset player', error);
+    }
+  }
+
+  if (isIvsPlaybackUrl(video.url) && window.IVSPlayer) {
+    if (!window.IVSPlayer.isPlayerSupported) {
+      noteElement.textContent = 'This browser does not support the Amazon IVS web player.';
+      return;
+    }
+
+    const player = window.IVSPlayer.create();
+    window.swPlayers[idPrefix] = player;
+    player.attachHTMLVideoElement(videoElement);
+    player.load(video.url);
+
+    if (idPrefix === 'live') {
+      const playPromise = player.play();
+      if (playPromise?.catch) {
+        playPromise.catch(() => {
+          noteElement.textContent = 'Live stream loaded. Tap play to start.';
+        });
+      }
+    }
+    return;
+  }
+
+  videoElement.src = video.url;
+  videoElement.load();
 }
 
 function renderLiveComments() {
@@ -184,6 +245,7 @@ function renderLiveComments() {
 }
 
 function renderLive() {
+  destroyPlayers();
   app.innerHTML = `
     ${navHTML('live')}
     <main class="app-shell">
@@ -221,6 +283,7 @@ function renderLive() {
 
   attachNavHandlers();
   renderLiveComments();
+  if (CONFIG.live.isLive) initVideoPlayer(CONFIG.live, 'live');
 
   document.getElementById('comment-form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -235,6 +298,7 @@ function renderLive() {
 }
 
 function renderArchive() {
+  destroyPlayers();
   const firstVideo = CONFIG.archiveVideos[0];
   app.innerHTML = `
     ${navHTML('archive')}
@@ -292,6 +356,16 @@ function renderArchiveComments(videoId) {
 }
 
 function renderArchiveDetails(video) {
+  if (window.swPlayers?.archive) {
+    try {
+      window.swPlayers.archive.pause?.();
+      window.swPlayers.archive.delete?.();
+    } catch (error) {
+      console.warn('Could not reset archive player', error);
+    }
+    delete window.swPlayers.archive;
+  }
+
   const details = document.getElementById('archive-details');
   details.innerHTML = `
     <div class="section-title-row">
@@ -312,6 +386,7 @@ function renderArchiveDetails(video) {
     </div>
   `;
 
+  initVideoPlayer(video, 'archive');
   renderArchiveComments(video.id);
 
   document.getElementById('archive-comment-form').addEventListener('submit', (event) => {

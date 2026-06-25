@@ -415,13 +415,22 @@ textarea:focus {
   }
 }
 
+@media (max-width: 700px) {
+  .brand-header {
+    display: none;
+  }
+
+  .app-shell {
+    padding-top: 18px;
+  }
+}
+
 @media (max-width: 560px) {
   .login-card,
   .video-card,
   .chat-card,
   .archive-list-card,
-  .archive-details-card,
-  .brand-header {
+  .archive-details-card {
     border-radius: 18px;
     padding: 18px;
   }

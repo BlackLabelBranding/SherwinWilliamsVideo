@@ -12,11 +12,9 @@ const CONFIG = {
     isLive: true,
     title: 'Sherwin-Williams Driver Live Stream',
     subtitle: 'Quarterly Driver Broadcast',
-    // Replace this with the Amazon IVS Playback URL when the real live channel is ready.
-    // Example format: https://xxxxxxxx.us-west-2.playback.live-video.net/api/video/v1/...
     url:
-      'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ',
-    type: 'video/quicktime'
+      'https://b64499066022.us-east-1.playback.live-video.net/api/video/v1/us-east-1.422110551656.channel.dZwIOQRbr5de.m3u8',
+    type: 'application/x-mpegURL'
   },
   archiveVideos: [
     {

@@ -1,335 +1,329 @@
-
 const app = document.getElementById('app');
 
+const CONFIG = {
+  brandLogoUrl:
+    'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/logosw.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3QvbG9nb3N3LnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNjE1MzgsImV4cCI6MTgxMzg5NzUzOH0.qJegJ35FBIyXGE1bPCSETdFiKmCzrjMtgqZA0PYOPPk',
+  users: {
+    driver1: 'pass123',
+    driver2: 'pass123',
+    admin: 'pass123'
+  },
+  live: {
+    isLive: true,
+    title: 'Sherwin-Williams Driver Live Stream',
+    subtitle: 'Quarterly Driver Broadcast',
+    url:
+      'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ',
+    type: 'video/quicktime'
+  },
+  archiveVideos: [
+    {
+      id: 'supabase-test-video',
+      title: 'Supabase Test Video',
+      date: 'Test Recording',
+      url:
+        'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swtestdelete.mov?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3d0ZXN0ZGVsZXRlLm1vdiIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNDExNTIsImV4cCI6MTgxMzg3NzE1Mn0.vBdU__lOCAIVpeSLZMjj0_ycaKOLTSO3UC8G3Lm1AlQ',
+      type: 'video/quicktime'
+    }
+  ]
+};
+
 function getToken() {
-  return localStorage.getItem('token');
+  return localStorage.getItem('sw_session_token');
 }
 
-function setToken(token) {
-  localStorage.setItem('token', token);
+function setToken(username) {
+  localStorage.setItem('sw_session_token', `demo-session-${Date.now()}`);
+  localStorage.setItem('sw_username', username);
 }
 
 function clearToken() {
-  localStorage.removeItem('token');
+  localStorage.removeItem('sw_session_token');
+  localStorage.removeItem('sw_username');
 }
 
-async function login(username, password) {
-  const res = await fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+function getUsername() {
+  return localStorage.getItem('sw_username') || 'driver';
+}
+
+function getStoredComments(key) {
+  return JSON.parse(localStorage.getItem(key) || '[]');
+}
+
+function saveStoredComments(key, comments) {
+  localStorage.setItem(key, JSON.stringify(comments));
+}
+
+function addComment(key, body) {
+  const comments = getStoredComments(key);
+  comments.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    username: getUsername(),
+    body: body.trim(),
+    timestamp: Date.now()
   });
-  if (!res.ok) {
-    throw new Error('Login failed');
+  saveStoredComments(key, comments);
+  return comments;
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleString();
+}
+
+function login(username, password) {
+  const expectedPassword = CONFIG.users[username];
+  if (!expectedPassword || expectedPassword !== password) {
+    throw new Error('Invalid username or password');
   }
-  return res.json();
+  setToken(username);
 }
 
-async function logout() {
-  const token = getToken();
-  await fetch('/api/logout', {
-    method: 'POST',
-    headers: { 'Authorization': token }
-  });
+function logout() {
   clearToken();
+  renderLogin();
 }
 
-async function fetchComments() {
-  // Fetch comments for the live stream
-  const token = getToken();
-  const res = await fetch('/api/comments', {
-    headers: { 'Authorization': token }
-  });
-  if (!res.ok) {
-    throw new Error('Failed to fetch comments');
-  }
-  return res.json();
-}
-
-async function postComment(body) {
-  // Post a comment to the live stream
-  const token = getToken();
-  const res = await fetch('/api/comments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': token },
-    body: JSON.stringify({ body })
-  });
-  if (!res.ok) {
-    throw new Error('Failed to post comment');
-  }
-  return res.json();
-}
-
-// Fetch live stream status and playback URL
-async function fetchIsLive() {
-  const token = getToken();
-  const res = await fetch('/api/is-live', {
-    headers: { 'Authorization': token }
-  });
-  if (!res.ok) {
-    throw new Error('Failed to fetch live status');
-  }
-  return res.json();
-}
-
-// Navigation bar HTML helper. Pass 'live' or 'archive' as the active tab.
 function navHTML(active) {
   return `
     <nav class="nav">
-      <ul>
-        <li id="nav-live" class="${active === 'live' ? 'active' : ''}">Live Stream</li>
-        <li id="nav-archive" class="${active === 'archive' ? 'active' : ''}">Archive</li>
-      </ul>
+      <button id="nav-live" class="nav-item ${active === 'live' ? 'active' : ''}" type="button">Live Stream</button>
+      <button id="nav-archive" class="nav-item ${active === 'archive' ? 'active' : ''}" type="button">Archive</button>
     </nav>
   `;
 }
 
-// Attach click handlers to navigation items
 function attachNavHandlers() {
-  const liveNav = document.getElementById('nav-live');
-  const archiveNav = document.getElementById('nav-archive');
-  if (liveNav) {
-    liveNav.addEventListener('click', () => {
-      renderLive();
-    });
-  }
-  if (archiveNav) {
-    archiveNav.addEventListener('click', () => {
-      renderArchive();
-    });
-  }
+  document.getElementById('nav-live')?.addEventListener('click', renderLive);
+  document.getElementById('nav-archive')?.addEventListener('click', renderArchive);
+}
+
+function renderHeader() {
+  return `
+    <header class="brand-header">
+      <img src="${CONFIG.brandLogoUrl}" alt="Sherwin-Williams logo" class="brand-logo" />
+      <div class="brand-copy">
+        <p class="eyebrow">Driver Communications Portal</p>
+        <h1>Sherwin-Williams Live</h1>
+      </div>
+    </header>
+  `;
 }
 
 function renderLogin() {
   app.innerHTML = `
-    <img src="/images/logo.png" alt="Sherwin-Williams logo" class="logo" />
-    <h1>Log In</h1>
-    <form id="login-form">
-      <input type="text" id="username" placeholder="Username" required />
-      <input type="password" id="password" placeholder="Password" required />
-      <button type="submit">Log In</button>
-    </form>
-    <div id="error" style="color: red"></div>
+    <main class="login-page">
+      <section class="login-card">
+        <img src="${CONFIG.brandLogoUrl}" alt="Sherwin-Williams logo" class="login-logo" />
+        <div class="login-copy">
+          <p class="eyebrow">Driver Communications Portal</p>
+          <h1>Log In</h1>
+          <p>Access live broadcasts, archived driver meetings, and event comments.</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <input type="text" id="username" placeholder="Username" autocomplete="username" required />
+          <input type="password" id="password" placeholder="Password" autocomplete="current-password" required />
+          <button type="submit" class="primary-button">Log In</button>
+        </form>
+        <p class="demo-note">Demo login: <strong>driver1</strong> / <strong>pass123</strong></p>
+        <div id="error" class="error-message"></div>
+      </section>
+    </main>
   `;
-  const form = document.getElementById('login-form');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('username').value;
+
+  document.getElementById('login-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     try {
-      const data = await login(username, password);
-      setToken(data.token);
+      login(username, password);
       renderLive();
-    } catch (err) {
-      document.getElementById('error').textContent = 'Invalid username or password';
+    } catch (error) {
+      document.getElementById('error').textContent = 'Invalid username or password.';
     }
   });
 }
 
-async function renderLive() {
-  // Build the live stream page with navigation and banner
-  app.innerHTML = navHTML('live') + `
-    <img src="/images/banner.jpeg" alt="Sherwin-Williams banner" class="banner" />
-    <h1>Live Stream</h1>
-    <div id="live-message" class="live-message"></div>
-    <div class="video-container" id="live-video-container" style="display:none;">
-      <video id="live-video" controls autoplay muted></video>
+function renderVideo(video, idPrefix) {
+  return `
+    <div class="video-shell">
+      <video id="${idPrefix}-video" controls playsinline preload="metadata">
+        <source src="${video.url}" type="${video.type || 'video/mp4'}" />
+        Your browser does not support this video format.
+      </video>
     </div>
-    <form id="comment-form">
-      <textarea id="comment-body" placeholder="Enter your comment" rows="3" required></textarea>
-      <button type="submit">Post Comment</button>
-    </form>
-    <ul class="comment-list" id="comment-list"></ul>
-    <button id="logout-btn">Log Out</button>
+    <p class="video-note">
+      If the video area loads but the file will not play, upload an MP4 version to Supabase and replace the URL.
+    </p>
   `;
-  // Attach nav handlers
-  attachNavHandlers();
-
-  const liveMessage = document.getElementById('live-message');
-  const videoContainer = document.getElementById('live-video-container');
-  const video = document.getElementById('live-video');
-  const commentForm = document.getElementById('comment-form');
-  const commentList = document.getElementById('comment-list');
-  const logoutBtn = document.getElementById('logout-btn');
-
-  // Fetch live status to determine if a live stream is available
-  try {
-    const status = await fetchIsLive();
-    if (status.isLive) {
-      video.src = status.url;
-      videoContainer.style.display = 'block';
-      liveMessage.textContent = '';
-    } else {
-      liveMessage.textContent = 'No live video at this time.';
-      liveMessage.style.padding = '20px';
-      liveMessage.style.backgroundColor = '#003c83';
-      liveMessage.style.borderRadius = '4px';
-    }
-  } catch (err) {
-    console.error(err);
-    liveMessage.textContent = 'Failed to load live stream status.';
-  }
-
-  async function loadComments() {
-    try {
-      const comments = await fetchComments();
-      commentList.innerHTML = '';
-      comments.forEach(c => {
-        const li = document.createElement('li');
-        li.className = 'comment';
-        const date = new Date(c.timestamp).toLocaleString();
-        li.innerHTML = `<div class="comment-meta"><strong>${c.username}</strong> at ${date}</div><div>${c.body}</div>`;
-        commentList.appendChild(li);
-      });
-      // Scroll to the bottom to show latest comment
-      commentList.scrollTop = commentList.scrollHeight;
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  commentForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = document.getElementById('comment-body').value;
-    try {
-      await postComment(body);
-      document.getElementById('comment-body').value = '';
-      await loadComments();
-    } catch (err) {
-      console.error(err);
-    }
-  });
-
-  logoutBtn.addEventListener('click', async () => {
-    await logout();
-    clearToken();
-    renderLogin();
-  });
-
-  // Initial load and periodic refresh of comments
-  await loadComments();
-  window.liveCommentInterval && clearInterval(window.liveCommentInterval);
-  window.liveCommentInterval = setInterval(loadComments, 10000);
 }
 
-// Render the archive page with a list of past videos and comments
-async function renderArchive() {
-  app.innerHTML = navHTML('archive') + `
-    <h1>Archive</h1>
-    <div id="archive-list"></div>
-    <div id="archive-details"></div>
-    <button id="logout-btn">Log Out</button>
+function renderLiveComments() {
+  const comments = getStoredComments('sw_live_comments');
+  const list = document.getElementById('comment-list');
+  list.innerHTML = '';
+
+  if (!comments.length) {
+    list.innerHTML = '<li class="empty-comments">No live comments yet.</li>';
+    return;
+  }
+
+  comments.forEach((comment) => {
+    const li = document.createElement('li');
+    li.className = 'live-comment';
+    li.innerHTML = `
+      <div class="comment-bubble">
+        <span class="comment-user">${comment.username}</span>
+        <span class="comment-time">${formatTime(comment.timestamp)}</span>
+        <p>${comment.body}</p>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+
+  list.scrollTop = list.scrollHeight;
+}
+
+function renderLive() {
+  app.innerHTML = `
+    ${navHTML('live')}
+    <main class="app-shell">
+      ${renderHeader()}
+      <section class="content-grid live-grid">
+        <div class="video-card">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Live Now</p>
+              <h2>${CONFIG.live.title}</h2>
+              <p>${CONFIG.live.subtitle}</p>
+            </div>
+            <span class="live-pill ${CONFIG.live.isLive ? 'on' : 'off'}">${CONFIG.live.isLive ? 'LIVE' : 'OFF AIR'}</span>
+          </div>
+          ${CONFIG.live.isLive ? renderVideo(CONFIG.live, 'live') : '<div class="no-video">No live video at this time.</div>'}
+        </div>
+
+        <aside class="chat-card">
+          <div class="section-title-row compact">
+            <div>
+              <p class="eyebrow">Live Comments</p>
+              <h2>Driver Chat</h2>
+            </div>
+          </div>
+          <ul class="live-comment-list" id="comment-list"></ul>
+          <form id="comment-form" class="comment-form">
+            <textarea id="comment-body" placeholder="Add a live comment..." rows="3" required></textarea>
+            <button type="submit" class="primary-button">Send</button>
+          </form>
+        </aside>
+      </section>
+      <button id="logout-btn" type="button" class="secondary-button">Log Out</button>
+    </main>
   `;
+
   attachNavHandlers();
-  const logoutBtn = document.getElementById('logout-btn');
-  logoutBtn.addEventListener('click', async () => {
-    await logout();
-    clearToken();
-    renderLogin();
+  renderLiveComments();
+
+  document.getElementById('comment-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = document.getElementById('comment-body');
+    if (!input.value.trim()) return;
+    addComment('sw_live_comments', input.value);
+    input.value = '';
+    renderLiveComments();
   });
-  // Load and display archive videos
-  try {
-    const token = getToken();
-    const res = await fetch('/api/archive-videos', { headers: { 'Authorization': token } });
-    if (!res.ok) throw new Error('Failed to fetch archive videos');
-    const videos = await res.json();
-    const listElem = document.getElementById('archive-list');
-    if (videos.length === 0) {
-      listElem.innerHTML = '<p>No archived videos available.</p>';
-    } else {
-      videos.forEach(video => {
-        const item = document.createElement('div');
-        item.className = 'archive-item';
-        item.textContent = video.title;
-        item.addEventListener('click', () => {
-          renderArchiveDetails(video);
-        });
-        listElem.appendChild(item);
-      });
-    }
-  } catch (err) {
-    console.error(err);
-    document.getElementById('archive-list').innerHTML = '<p>Error loading archive.</p>';
+
+  document.getElementById('logout-btn').addEventListener('click', logout);
+}
+
+function renderArchive() {
+  const firstVideo = CONFIG.archiveVideos[0];
+  app.innerHTML = `
+    ${navHTML('archive')}
+    <main class="app-shell">
+      ${renderHeader()}
+      <section class="archive-layout">
+        <div class="archive-list-card">
+          <p class="eyebrow">Past Broadcasts</p>
+          <h2>Archive</h2>
+          <div id="archive-list" class="archive-list"></div>
+        </div>
+        <div id="archive-details" class="archive-details-card"></div>
+      </section>
+      <button id="logout-btn" type="button" class="secondary-button">Log Out</button>
+    </main>
+  `;
+
+  attachNavHandlers();
+  document.getElementById('logout-btn').addEventListener('click', logout);
+
+  const list = document.getElementById('archive-list');
+  CONFIG.archiveVideos.forEach((video) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'archive-item';
+    button.innerHTML = `<strong>${video.title}</strong><span>${video.date}</span>`;
+    button.addEventListener('click', () => renderArchiveDetails(video));
+    list.appendChild(button);
+  });
+
+  if (firstVideo) {
+    renderArchiveDetails(firstVideo);
   }
 }
 
-// Fetch comments for a specific archived video
-async function fetchArchiveComments(videoId) {
-  const token = getToken();
-  const res = await fetch(`/api/archive-comments/${videoId}`, {
-    headers: { 'Authorization': token }
-  });
-  if (!res.ok) {
-    throw new Error('Failed to fetch archive comments');
+function renderArchiveComments(videoId) {
+  const comments = getStoredComments(`sw_archive_comments_${videoId}`);
+  const list = document.getElementById('archive-comment-list');
+  list.innerHTML = '';
+
+  if (!comments.length) {
+    list.innerHTML = '<li class="empty-comments">No archive comments yet.</li>';
+    return;
   }
-  return res.json();
+
+  comments.forEach((comment) => {
+    const li = document.createElement('li');
+    li.className = 'archive-comment';
+    li.innerHTML = `
+      <div class="comment-meta"><strong>${comment.username}</strong> · ${formatTime(comment.timestamp)}</div>
+      <p>${comment.body}</p>
+    `;
+    list.appendChild(li);
+  });
 }
 
-// Post a comment on an archived video
-async function postArchiveComment(videoId, body) {
-  const token = getToken();
-  const res = await fetch(`/api/archive-comments/${videoId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': token },
-    body: JSON.stringify({ body })
-  });
-  if (!res.ok) {
-    throw new Error('Failed to post archive comment');
-  }
-  return res.json();
-}
-
-// Render details for a selected archive video including player and comments
-async function renderArchiveDetails(video) {
+function renderArchiveDetails(video) {
   const details = document.getElementById('archive-details');
   details.innerHTML = `
-    <h2>${video.title}</h2>
-    <div class="video-container">
-      <video id="archive-video" controls autoplay></video>
+    <div class="section-title-row">
+      <div>
+        <p class="eyebrow">Archive Video</p>
+        <h2>${video.title}</h2>
+        <p>${video.date}</p>
+      </div>
     </div>
-    <form id="archive-comment-form">
-      <textarea id="archive-comment-body" placeholder="Enter your comment" rows="3" required></textarea>
-      <button type="submit">Post Comment</button>
-    </form>
-    <ul class="comment-list" id="archive-comment-list"></ul>
+    ${renderVideo(video, 'archive')}
+    <div class="archive-comments-block">
+      <h3>Comments</h3>
+      <form id="archive-comment-form" class="comment-form archive-style">
+        <textarea id="archive-comment-body" placeholder="Add a comment on this recording..." rows="3" required></textarea>
+        <button type="submit" class="primary-button">Post Comment</button>
+      </form>
+      <ul class="archive-comment-list" id="archive-comment-list"></ul>
+    </div>
   `;
-  // Set video source
-  const videoEl = document.getElementById('archive-video');
-  videoEl.src = video.url;
-  // Load comments
-  async function loadArchiveComments() {
-    try {
-      const comments = await fetchArchiveComments(video.id);
-      const list = document.getElementById('archive-comment-list');
-      list.innerHTML = '';
-      comments.forEach(c => {
-        const li = document.createElement('li');
-        li.className = 'comment';
-        const date = new Date(c.timestamp).toLocaleString();
-        li.innerHTML = `<div class="comment-meta"><strong>${c.username}</strong> at ${date}</div><div>${c.body}</div>`;
-        list.appendChild(li);
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  }
-  // Submit handler for archive comments
-  const form = document.getElementById('archive-comment-form');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = document.getElementById('archive-comment-body').value;
-    try {
-      await postArchiveComment(video.id, body);
-      document.getElementById('archive-comment-body').value = '';
-      await loadArchiveComments();
-    } catch (err) {
-      console.error(err);
-    }
+
+  renderArchiveComments(video.id);
+
+  document.getElementById('archive-comment-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = document.getElementById('archive-comment-body');
+    if (!input.value.trim()) return;
+    addComment(`sw_archive_comments_${video.id}`, input.value);
+    input.value = '';
+    renderArchiveComments(video.id);
   });
-  await loadArchiveComments();
 }
 
-// Check token and render accordingly
 if (getToken()) {
   renderLive();
 } else {

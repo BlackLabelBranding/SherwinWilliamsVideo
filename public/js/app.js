@@ -2,7 +2,7 @@ const app = document.getElementById('app');
 
 const CONFIG = {
   brandLogoUrl:
-    'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/logosw.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3QvbG9nb3N3LnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIzNjE1MzgsImV4cCI6MTgxMzg5NzUzOH0.qJegJ35FBIyXGE1bPCSETdFiKmCzrjMtgqZA0PYOPPk',
+    'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swlogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3dsb2dvLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODI0MDMzMTcsImV4cCI6MTgxMzkzOTMxN30.TGAWii5ki334PMuX7End29HH6BdmNHA2dN7XX5VrOj8',
   users: {
     driver1: 'pass123',
     driver2: 'pass123',

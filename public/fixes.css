@@ -43,6 +43,18 @@
   text-transform: uppercase !important;
 }
 
+.archive-comment,
+.archive-comment p,
+.archive-comment .comment-meta,
+.archive-comment strong {
+  color: #111827 !important;
+}
+
+.archive-comment {
+  background: #f8fbff !important;
+  border: 1px solid rgba(0, 73, 144, 0.18) !important;
+}
+
 @media (max-width: 560px) {
   .metrics-strip,
   .injected-metrics {

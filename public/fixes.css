@@ -1,0 +1,63 @@
+.video-note {
+  display: none !important;
+}
+
+.metrics-strip,
+.injected-metrics {
+  display: flex !important;
+  grid-template-columns: none !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  width: 100% !important;
+  margin: 14px 0 18px !important;
+}
+
+.metric-card {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  padding: 12px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  text-align: center !important;
+}
+
+.metric-value {
+  display: block !important;
+  color: #ffffff !important;
+  font-size: clamp(20px, 2.8vw, 30px) !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.metric-label {
+  display: block !important;
+  margin-top: 6px !important;
+  color: rgba(255, 255, 255, 0.84) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.15 !important;
+  text-transform: uppercase !important;
+}
+
+@media (max-width: 560px) {
+  .metrics-strip,
+  .injected-metrics {
+    gap: 6px !important;
+  }
+
+  .metric-card {
+    padding: 10px 6px !important;
+  }
+
+  .metric-value {
+    font-size: 18px !important;
+  }
+
+  .metric-label {
+    font-size: 9px !important;
+  }
+}

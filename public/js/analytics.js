@@ -57,10 +57,11 @@ function swTrackArchive() {
   const title = details.querySelector('h2')?.textContent || 'Archive Video';
   const id = swSlug(title);
   const metrics = swGetMetrics();
-  metrics.archives[id] = metrics.archives[id] || { views: 0, comments: 0 };
+  metrics.archives[id] = metrics.archives[id] || { views: 0, uniqueViewers: 0, comments: 0 };
 
   if (!sessionStorage.getItem('sw_archive_view_' + id)) {
     metrics.archives[id].views += 1;
+    metrics.archives[id].uniqueViewers += 1;
     sessionStorage.setItem('sw_archive_view_' + id, 'true');
   }
 
@@ -71,14 +72,22 @@ function swTrackArchive() {
   if (anchor) {
     anchor.insertAdjacentHTML('beforebegin', swMetricRow([
       { value: metrics.archives[id].views, label: 'Views' },
+      { value: metrics.archives[id].uniqueViewers, label: 'Unique Viewers' },
       { value: metrics.archives[id].comments, label: 'Comments' }
     ]));
   }
 }
 
+function swRefreshMetrics() {
+  swTrackLive();
+  swTrackArchive();
+}
+
 new MutationObserver(function () {
-  requestAnimationFrame(function () {
-    swTrackLive();
-    swTrackArchive();
-  });
+  requestAnimationFrame(swRefreshMetrics);
 }).observe(document.body, { childList: true, subtree: true });
+
+swRefreshMetrics();
+setTimeout(swRefreshMetrics, 100);
+setTimeout(swRefreshMetrics, 500);
+setTimeout(swRefreshMetrics, 1000);

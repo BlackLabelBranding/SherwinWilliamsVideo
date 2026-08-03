@@ -13,7 +13,7 @@ const CONFIG = {
     title: 'Sherwin-Williams Driver Live Stream',
     subtitle: 'Quarterly Driver Broadcast',
     url:
-      'https://b64499066022.us-east-1.playback.live-video.net/api/video/v1/us-east-1.422110551656.channel.dZwIOQRbr5de.m3u8',
+      'https://0ec79f9267a5.us-east-1.playback.live-video.net/api/video/v1/us-east-1.089601769025.channel.cm8GRMkNVXU8.m3u8',
     type: 'application/x-mpegURL'
   },
   archiveVideos: [

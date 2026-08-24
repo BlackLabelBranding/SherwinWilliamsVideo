@@ -17,6 +17,8 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -308,8 +310,11 @@ select:focus {
 
 .app-shell {
   width: min(1180px, 100%);
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 22px 16px 48px;
+  overflow-x: clip;
 }
 
 .content-grid,
@@ -609,6 +614,9 @@ select:focus {
 .admin-page {
   display: grid;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-heading,
@@ -617,10 +625,21 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-heading > div,
+.admin-section-title > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .admin-heading h2 {
   margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-status {
@@ -631,6 +650,7 @@ select:focus {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
+  flex: 0 0 auto;
 }
 
 .portal-card {
@@ -639,12 +659,17 @@ select:focus {
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .portal-card h2,
 .portal-card h3 {
   color: #003b78;
   margin-top: 0;
+  overflow-wrap: anywhere;
 }
 
 .narrow-card {
@@ -684,9 +709,19 @@ select:focus {
 }
 
 .metrics-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 14px 0;
+}
+
+.metric-card {
+  min-width: 0;
+  padding: 12px 10px;
+  border-radius: 12px;
+  background: #f4f7fb;
+  border: 1px solid #dbe4ee;
+  text-align: center;
 }
 
 .analytics-body {
@@ -728,16 +763,6 @@ select:focus {
   cursor: wait;
 }
 
-.metric-card {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 10px;
-  border-radius: 12px;
-  background: #f4f7fb;
-  border: 1px solid #dbe4ee;
-  text-align: center;
-}
-
 .metric-value {
   display: block;
   color: #003b78;
@@ -757,14 +782,16 @@ select:focus {
 
 .table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin-top: 14px;
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 680px;
+  min-width: 560px;
 }
 
 .admin-table th,
@@ -813,16 +840,24 @@ select:focus {
   margin: 4px 0 0;
   color: #667085;
   font-size: 13px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-live-preview {
   margin-top: 8px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-live-preview .no-video {
   color: #334155;
   background: #f1f5f9;
   border-color: #cbd5e1;
+  min-height: 180px;
+  font-size: 0.95rem;
+  padding: 16px;
+  overflow-wrap: anywhere;
 }
 
 .admin-live-preview .eyebrow {
@@ -831,6 +866,12 @@ select:focus {
 
 .admin-live-preview h3 {
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .secondary-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
@@ -841,11 +882,44 @@ select:focus {
 
   .nav {
     flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .nav-brand {
+    width: auto;
+    margin-right: auto;
+  }
+
+  .nav-links {
+    width: 100%;
+    order: 3;
+    justify-content: stretch;
+  }
+
+  .nav-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 13px;
   }
 
   .nav-user {
-    width: 100%;
-    justify-content: flex-end;
+    width: auto;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .metrics-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell {
+    padding: 12px 12px 32px;
+  }
+
+  .admin-page {
+    gap: 10px;
   }
 }
 
@@ -862,18 +936,27 @@ select:focus {
   .admin-section-title {
     align-items: flex-start;
     flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .admin-heading > div,
+  .admin-section-title > div {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .admin-section-title .secondary-button {
+    width: 100%;
+  }
+
+  .admin-heading h2 {
+    font-size: 1.4rem;
+    line-height: 1.15;
   }
 }
 
 @media (max-width: 560px) {
-  .nav-links {
-    width: 100%;
-  }
-
-  .nav-item {
-    flex: 1;
-  }
-
   .login-card,
   .video-card,
   .chat-card,
@@ -881,14 +964,72 @@ select:focus {
   .archive-details-card,
   .portal-card {
     border-radius: 14px;
-    padding: 16px;
+    padding: 12px;
+  }
+
+  .portal-card h3 {
+    margin-bottom: 4px;
+  }
+
+  .admin-section-title {
+    gap: 6px;
+  }
+
+  .admin-section-title p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .admin-page .secondary-button {
+    margin-top: 4px;
+    padding: 10px 14px;
+  }
+
+  .admin-live-preview {
+    margin-top: 6px;
+  }
+
+  .admin-live-preview .no-video {
+    min-height: 140px;
+    font-size: 0.9rem;
+    padding: 12px;
   }
 
   .metrics-strip {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 10px 0;
   }
 
   .metric-card {
-    flex: 1 1 calc(50% - 10px);
+    padding: 10px 8px;
+  }
+
+  .metric-value {
+    font-size: 18px;
+  }
+
+  .metric-label {
+    font-size: 9px;
+  }
+
+  .admin-table {
+    min-width: 480px;
+  }
+
+  .table-wrap {
+    margin-top: 10px;
+  }
+
+  .no-video {
+    min-height: 140px;
+    font-size: 0.9rem;
+  }
+
+  .nav-user span {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

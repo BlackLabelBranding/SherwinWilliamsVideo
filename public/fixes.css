@@ -37,6 +37,28 @@
 .upload-progress { min-height:22px; font-weight:800; color:#004990; }
 .audio-player { width:100%; margin:18px 0; }
 .media-description { color:#4b5563; line-height:1.55; }
+.live-stream-list { display:grid; gap:10px; margin:16px 0 18px; }
+.live-stream-item {
+  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  border:1px solid #d7e0ea; background:#f7fafc; color:#172033; border-radius:14px;
+  padding:12px 14px; cursor:pointer; transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.live-stream-item:hover { border-color:#004990; background:#eef5fb; }
+.live-stream-item.active { border-color:#ec1c24; background:#fff5f5; box-shadow:0 0 0 3px rgba(236,28,36,.12); }
+.live-stream-dot { width:10px; height:10px; border-radius:50%; background:#ec1c24; flex:0 0 auto; box-shadow:0 0 0 4px rgba(236,28,36,.18); }
+.live-stream-copy { display:grid; gap:2px; flex:1; min-width:0; }
+.live-stream-copy strong { font-size:14px; color:#003b78; }
+.live-stream-copy span { font-size:12px; color:#667085; }
+.live-stream-badge {
+  flex:0 0 auto; font-size:11px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+  color:#ec1c24; background:rgba(236,28,36,.1); border-radius:999px; padding:6px 10px;
+}
+.live-stream-item.active .live-stream-badge { color:#fff; background:#ec1c24; }
+.admin-live-preview { margin-top:8px; }
+.admin-page .secondary-button {
+  margin:0; background:#eef3f8; color:#003b78; border:1px solid #c9d6e4;
+}
+.video-card .live-stream-list { margin-top:4px; }
 @media (max-width:900px) { .video-card,.archive-details-card { display:flex!important; flex-direction:column!important; } .archive-details-card { order:1!important; } .archive-list-card { order:2!important; } }
 @media (max-width:800px) { .form-grid { grid-template-columns:1fr; } .form-grid .wide-field { grid-column:auto; } .admin-heading,.admin-section-title { align-items:flex-start; flex-direction:column; } }
 @media (max-width:560px) { .metrics-strip,.injected-metrics { gap:6px!important; } .metric-card { padding:10px 6px!important; } .metric-value { font-size:18px!important; } .metric-label { font-size:9px!important; } .portal-card { padding:18px; border-radius:14px; } .portal-footer-actions { flex-direction:column; } .portal-footer-actions button { width:100%; } }

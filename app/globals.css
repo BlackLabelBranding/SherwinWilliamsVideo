@@ -997,6 +997,10 @@ select:focus {
     padding: 8px 12px;
   }
 
+  .nav-spacer {
+    height: 108px;
+  }
+
   .nav-brand {
     width: auto;
     margin-right: auto;

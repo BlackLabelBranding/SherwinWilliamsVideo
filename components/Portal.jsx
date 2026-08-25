@@ -8,6 +8,7 @@ import ArchiveView from '@/components/ArchiveView';
 import AdminView from '@/components/AdminView';
 import ChangePassword from '@/components/ChangePassword';
 import LoadingScreen from '@/components/LoadingScreen';
+import { ModalProvider, friendlyError, useModal } from '@/components/ModalProvider';
 import { api } from '@/lib/client';
 
 function patchIvsCompat() {
@@ -34,6 +35,15 @@ function patchIvsCompat() {
 }
 
 export default function Portal() {
+  return (
+    <ModalProvider>
+      <PortalApp />
+    </ModalProvider>
+  );
+}
+
+function PortalApp() {
+  const { notify } = useModal();
   const [ready, setReady] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading…');
   const [contentLoading, setContentLoading] = useState(false);
@@ -263,7 +273,7 @@ export default function Portal() {
       setLiveStreams(data.liveStreams || []);
       setMedia(data.media || []);
     } catch (error) {
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     } finally {
       setContentLoading(false);
     }

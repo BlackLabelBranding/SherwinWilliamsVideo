@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
+import { friendlyError, useModal } from '@/components/ModalProvider';
 import { api, fmtDate } from '@/lib/client';
 
 export default function ArchiveView({ token, media, onPlaying }) {
+  const { notify } = useModal();
   const [selected, setSelected] = useState(media[0] || null);
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState('');
@@ -70,7 +72,7 @@ export default function ArchiveView({ token, media, onPlaying }) {
       setComments(result.comments || []);
     } catch (error) {
       setCommentBody(value);
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     }
   }
 

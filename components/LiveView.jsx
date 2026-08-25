@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
+import { friendlyError, useModal } from '@/components/ModalProvider';
 import { api, fmtDate } from '@/lib/client';
 
 function StreamList({ streams, activeId, emptyText, onSelect }) {
@@ -44,6 +45,7 @@ export default function LiveView({
   onSelectStream,
   onPlaying
 }) {
+  const { notify } = useModal();
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState('');
   const streams = liveStreams || [];
@@ -107,7 +109,7 @@ export default function LiveView({
       setComments(result.comments || []);
     } catch (error) {
       setCommentBody(value);
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     }
   }
 

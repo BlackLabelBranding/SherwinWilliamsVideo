@@ -224,6 +224,82 @@ select:focus {
   font-weight: 700;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 18, 40, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.app-modal {
+  width: min(420px, 100%);
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  background: linear-gradient(180deg, #0a3a6e 0%, #002a5c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.app-modal-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.app-modal h2 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+
+.app-modal-message {
+  margin: 0 0 18px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.app-modal--error .app-modal-eyebrow {
+  color: #ffb4b8;
+}
+
+.app-modal--success .app-modal-eyebrow {
+  color: #9dffb8;
+}
+
+.app-modal-form {
+  display: grid;
+  gap: 12px;
+}
+
+.app-modal-form input {
+  width: 100%;
+}
+
+.app-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .error-message {
   margin-top: 12px;
   color: #ffd6d9;

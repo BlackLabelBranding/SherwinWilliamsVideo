@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { StreamList } from '@/components/LiveView';
+import { friendlyError, useModal } from '@/components/ModalProvider';
 import { api, fmtDate, fmtDuration } from '@/lib/client';
 
 function MetricCard({ value, label }) {
@@ -25,6 +26,7 @@ export default function AdminView({
   onRefreshLive,
   onPlaying
 }) {
+  const { notify, prompt } = useModal();
   const [users, setUsers] = useState([]);
   const [metrics, setMetrics] = useState({ live: {}, active: [] });
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -68,7 +70,7 @@ export default function AdminView({
   }
 
   useEffect(() => {
-    loadAdmin().catch((error) => alert(error.message));
+    loadAdmin().catch((error) => notify({ message: friendlyError(error), tone: 'error' }));
     loadMetrics();
     const timer = setInterval(loadMetrics, 10000);
     return () => clearInterval(timer);
@@ -96,10 +98,14 @@ export default function AdminView({
         token
       );
       event.currentTarget.reset();
-      alert('Driver account created. They will be required to change the temporary password.');
+      notify({
+        title: 'Account created',
+        message: 'Driver account created. They will be required to change the temporary password.',
+        tone: 'success'
+      });
       await loadAdmin();
     } catch (error) {
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     } finally {
       setCreateBusy(false);
     }
@@ -117,12 +123,18 @@ export default function AdminView({
       );
       await loadAdmin();
     } catch (error) {
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     }
   }
 
   async function resetPassword(userId) {
-    const password = prompt('Enter a temporary password (minimum 10 characters):');
+    const password = await prompt({
+      title: 'Reset password',
+      message: 'Enter a temporary password (minimum 10 characters).',
+      inputType: 'password',
+      minLength: 10,
+      confirmLabel: 'Reset password'
+    });
     if (!password) return;
     try {
       await api(
@@ -130,9 +142,13 @@ export default function AdminView({
         { method: 'POST', body: JSON.stringify({ action: 'reset-password', userId, password }) },
         token
       );
-      alert('Password reset. The driver must change it after login.');
+      notify({
+        title: 'Password reset',
+        message: 'Password reset. The driver must change it after login.',
+        tone: 'success'
+      });
     } catch (error) {
-      alert(error.message);
+      notify({ message: friendlyError(error), tone: 'error' });
     }
   }
 
@@ -156,9 +172,14 @@ export default function AdminView({
         token
       );
       setTrimProgress(`Saved. Backup: ${result.backupKey}`);
-      alert('Trim complete. Archive will use the updated playlist.');
+      notify({
+        title: 'Trim complete',
+        message: 'Archive will use the updated playlist.',
+        tone: 'success'
+      });
     } catch (error) {
-      setTrimProgress(error.message);
+      setTrimProgress(friendlyError(error));
+      notify({ message: friendlyError(error), tone: 'error' });
     }
   }
 

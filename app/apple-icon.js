@@ -1,14 +1,10 @@
 import { ImageResponse } from 'next/og';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
 
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
 
-export default async function AppleIcon() {
-  const logoData = await readFile(join(process.cwd(), 'public', 'sw-logo.png'));
-  const logoSrc = `data:image/png;base64,${logoData.toString('base64')}`;
-
+/** Lightweight circle mark — do not embed the large public/sw-logo.png (OOM on Vercel). */
+export default function AppleIcon() {
   return new ImageResponse(
     (
       <div
@@ -19,21 +15,15 @@ export default async function AppleIcon() {
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: '50%',
-          overflow: 'hidden',
-          background: '#004990'
+          background: '#004990',
+          color: '#ffffff',
+          fontSize: 72,
+          fontWeight: 700,
+          letterSpacing: '-0.04em',
+          fontFamily: 'system-ui, sans-serif'
         }}
       >
-        <img
-          src={logoSrc}
-          alt=""
-          width={180}
-          height={180}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-        />
+        SW
       </div>
     ),
     { ...size }

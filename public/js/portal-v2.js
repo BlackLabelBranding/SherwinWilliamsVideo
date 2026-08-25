@@ -4,10 +4,14 @@ const state = {
   token: localStorage.getItem('sw_session_token') || '',
   user: null,
   live: null,
+  liveStreams: [],
+  selectedLiveId: localStorage.getItem('sw_selected_live_id') || '',
   media: [],
   currentView: null,
   heartbeatTimer: null,
-  adminTimer: null
+  adminTimer: null,
+  livePollTimer: null,
+  _lastLiveIds: ''
 };
 
 const BRAND_LOGO = 'https://kilmhwlsqgjxjhvsweqb.supabase.co/storage/v1/object/sign/sherwin%20williams%20test/swlogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iZjdlOGY4OS00MDI1LTQxMDItYTY4OS0zNGU4YzIzOGUxODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzaGVyd2luIHdpbGxpYW1zIHRlc3Qvc3dsb2dvLnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODI0MDMzMTcsImV4cCI6MTgxMzkzOTMxN30.TGAWii5ki334PMuX7End29HH6BdmNHA2dN7XX5VrOj8';
@@ -89,6 +93,76 @@ function wireShell() {
 function stopAdminRefresh() {
   if (state.adminTimer) clearInterval(state.adminTimer);
   state.adminTimer = null;
+  stopLivePoll();
+}
+
+function stopLivePoll() {
+  if (state.livePollTimer) clearInterval(state.livePollTimer);
+  state.livePollTimer = null;
+}
+
+function startLivePoll() {
+  stopLivePoll();
+  state.livePollTimer = setInterval(async () => {
+    if (!document.querySelector('.live-grid') && !document.getElementById('admin-live-streams')) return;
+    try {
+      await loadContent();
+      const ids = (state.liveStreams || []).map((s) => s.id).sort().join(',');
+      if (ids !== state._lastLiveIds) {
+        state._lastLiveIds = ids;
+        if (document.querySelector('.live-grid')) renderLive();
+        else if (document.getElementById('admin-live-streams')) fillAdminLiveStreams();
+      }
+    } catch (error) {
+      console.warn('Live stream poll failed.', error);
+    }
+  }, 12000);
+}
+
+function resolveActiveLive() {
+  const streams = state.liveStreams || [];
+  if (state.selectedLiveId) {
+    const selected = streams.find((s) => s.id === state.selectedLiveId);
+    if (selected) return selected;
+  }
+  if (state.live?.status === 'live' && state.live?.playback_url) return state.live;
+  return streams[0] || state.live || null;
+}
+
+function liveStreamListHtml(streams, activeId, emptyText) {
+  if (!streams.length) {
+    return `<p class="empty-comments">${escapeHtml(emptyText || 'No active streams on AWS IVS right now.')}</p>`;
+  }
+  return streams.map((stream) => {
+    const active = stream.id === activeId;
+    const started = stream.started_at ? fmtDate(stream.started_at) : '';
+    return `<button type="button" class="live-stream-item ${active ? 'active' : ''}" data-live-id="${escapeHtml(stream.id)}">
+      <span class="live-stream-dot"></span>
+      <span class="live-stream-copy">
+        <strong>${escapeHtml(stream.title)}</strong>
+        <span>${started ? `Started ${escapeHtml(started)}` : 'Live now'}${stream.viewer_count != null ? ` · ${stream.viewer_count} viewers` : ''}</span>
+      </span>
+      <span class="live-stream-badge">${active ? 'Watching' : 'Live'}</span>
+    </button>`;
+  }).join('');
+}
+
+async function selectLiveStream(streamId, { persist = false } = {}) {
+  const stream = (state.liveStreams || []).find((s) => s.id === streamId);
+  if (!stream) return;
+  state.selectedLiveId = stream.id;
+  state.live = stream;
+  localStorage.setItem('sw_selected_live_id', stream.id);
+  if (persist && state.user?.role === 'admin') {
+    try {
+      await api('/api/admin', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'select-live', channelId: stream.id })
+      });
+    } catch (error) {
+      console.warn('Could not persist selected live stream.', error);
+    }
+  }
 }
 
 async function endTracking() {
@@ -188,6 +262,7 @@ function renderLogin(message = '') {
       button.disabled = false;
     }
   });
+
 }
 
 async function restoreSession() {
@@ -252,7 +327,13 @@ function renderChangePassword(required = false) {
 async function loadContent() {
   const result = await api('/api/content');
   state.live = result.live;
+  state.liveStreams = result.liveStreams || [];
   state.media = result.media || [];
+  if (state.selectedLiveId && !state.liveStreams.some((s) => s.id === state.selectedLiveId)) {
+    state.selectedLiveId = state.liveStreams[0]?.id || '';
+    if (state.selectedLiveId) localStorage.setItem('sw_selected_live_id', state.selectedLiveId);
+    else localStorage.removeItem('sw_selected_live_id');
+  }
 }
 
 async function loadContentAndRender() {
@@ -265,21 +346,90 @@ async function loadContentAndRender() {
   }
 }
 
+function isHlsUrl(url) {
+  return url.includes('playback.live-video.net')
+    || url.includes('.m3u8')
+    || url.includes('/api/hls');
+}
+
+function destroyPlayers(element) {
+  if (!element) return;
+  if (element._ivsPlayer) {
+    try { element._ivsPlayer.delete(); } catch {}
+    element._ivsPlayer = null;
+  }
+  if (element._hlsPlayer) {
+    try { element._hlsPlayer.destroy(); } catch {}
+    element._hlsPlayer = null;
+  }
+}
+
 function initVideoPlayer(element, url, contentType, contentId) {
   if (!element || !url) return;
+  destroyPlayers(element);
   const begin = () => startTracking(contentType, contentId);
   element.addEventListener('playing', begin, { once: true });
 
-  if ((url.includes('playback.live-video.net') || url.includes('.m3u8')) && window.IVSPlayer?.isPlayerSupported) {
+  const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).toString();
+  const isArchiveProxy = url.includes('/api/hls');
+  const isIvsLive = url.includes('playback.live-video.net');
+
+  // Archive HLS from private S3 proxy — use hls.js (Chrome) or native Safari
+  if (isArchiveProxy || (isHlsUrl(url) && !isIvsLive)) {
+    if (window.Hls?.isSupported()) {
+      const hls = new window.Hls({
+        enableWorker: false,
+        lowLatencyMode: false,
+        startLevel: 0,
+        capLevelToPlayerSize: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        manifestLoadingTimeOut: 120000,
+        levelLoadingTimeOut: 120000,
+        fragLoadingTimeOut: 180000,
+        fragLoadingMaxRetry: 6,
+        levelLoadingMaxRetry: 6,
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = false;
+        }
+      });
+      hls.loadSource(absoluteUrl);
+      hls.attachMedia(element);
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        element.muted = true;
+        element.play().catch(() => {});
+      });
+      hls.on(window.Hls.Events.ERROR, (_, data) => {
+        console.warn('HLS playback error', data);
+        if (!data?.fatal) return;
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+          hls.startLoad();
+        } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+        }
+      });
+      element._hlsPlayer = hls;
+      return;
+    }
+    if (element.canPlayType('application/vnd.apple.mpegurl')) {
+      element.src = absoluteUrl;
+      element.load();
+      element.play().catch(() => {});
+      return;
+    }
+  }
+
+  if (isIvsLive && window.IVSPlayer?.isPlayerSupported) {
     const player = window.IVSPlayer.create();
     player.setLiveLowLatencyEnabled?.(true);
     player.attachHTMLVideoElement(element);
-    player.load(url);
-    if (contentType === 'live') player.play().catch(() => {});
+    player.load(absoluteUrl);
+    player.play().catch(() => {});
     element._ivsPlayer = player;
     return;
   }
-  element.src = url;
+
+  element.src = absoluteUrl;
   element.load();
 }
 
@@ -316,16 +466,21 @@ function wireCommentForm(formId, inputId, contentType, contentId, listId) {
 function renderLive() {
   stopAdminRefresh();
   endTracking();
-  const live = state.live;
-  const isLive = live?.status === 'live';
+  const streams = state.liveStreams || [];
+  const live = resolveActiveLive();
+  state.live = live;
+  const isLive = live?.status === 'live' && Boolean(live?.playback_url);
+  state._lastLiveIds = streams.map((s) => s.id).sort().join(',');
+
   app.innerHTML = shell(`
     <section class="content-grid live-grid">
       <div class="video-card">
         <div class="section-title-row">
-          <div><p class="eyebrow">${isLive ? 'Live Now' : 'Broadcast'}</p><h2>${escapeHtml(live?.title || 'Sherwin-Williams Driver Live Stream')}</h2><p>${escapeHtml(live?.subtitle || '')}</p></div>
+          <div><p class="eyebrow">${isLive ? 'Live Now' : 'Broadcast'}</p><h2>${escapeHtml(live?.title || 'Sherwin-Williams Driver Live Stream')}</h2><p>${escapeHtml(live?.subtitle || 'Waiting for an IVS stream to start')}</p></div>
           <span class="live-pill ${isLive ? 'on' : 'off'}">${isLive ? 'LIVE' : 'OFF AIR'}</span>
         </div>
-        ${isLive && live?.playback_url ? `<div class="video-shell"><video id="live-video" controls playsinline muted preload="metadata"></video></div><p class="video-note">Amazon IVS low-latency playback.</p>` : '<div class="no-video">No live video at this time.</div>'}
+        ${streams.length > 1 ? `<div class="live-stream-list" id="live-stream-picker">${liveStreamListHtml(streams, live?.id, '')}</div>` : ''}
+        ${isLive ? `<div class="video-shell"><video id="live-video" controls playsinline muted preload="metadata"></video></div><p class="video-note">Amazon IVS low-latency playback · auto-detects when a stream goes live.</p>` : '<div class="no-video">No live video at this time. When streaming starts on AWS IVS, it will appear here automatically.</div>'}
       </div>
       <aside class="chat-card">
         <div class="section-title-row compact"><div><p class="eyebrow">Live Comments</p><h2>Driver Chat</h2></div></div>
@@ -335,6 +490,15 @@ function renderLive() {
     </section>
   `, 'live');
   wireShell();
+  startLivePoll();
+
+  document.querySelectorAll('#live-stream-picker [data-live-id]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      await selectLiveStream(button.dataset.liveId);
+      renderLive();
+    });
+  });
+
   if (isLive && live?.playback_url) initVideoPlayer(document.getElementById('live-video'), live.playback_url, 'live', live.id);
   if (live?.id) {
     loadComments('live', live.id, 'live-comment-list');
@@ -421,6 +585,32 @@ async function refreshAdminMetrics() {
   }
 }
 
+function fillAdminLiveStreams() {
+  const list = document.getElementById('admin-live-streams');
+  const preview = document.getElementById('admin-live-preview');
+  if (!list) return;
+  const streams = state.liveStreams || [];
+  const live = resolveActiveLive();
+  list.innerHTML = liveStreamListHtml(streams, live?.id, 'No active streams. Start broadcasting on an AWS IVS channel and it will show up here.');
+
+  list.querySelectorAll('[data-live-id]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      await selectLiveStream(button.dataset.liveId, { persist: true });
+      fillAdminLiveStreams();
+    });
+  });
+
+  if (!preview) return;
+  if (live?.status === 'live' && live?.playback_url) {
+    preview.innerHTML = `
+      <div class="section-title-row compact"><div><p class="eyebrow">Selected Stream</p><h3>${escapeHtml(live.title)}</h3></div><span class="live-pill on">LIVE</span></div>
+      <div class="video-shell"><video id="admin-live-video" controls playsinline muted preload="metadata"></video></div>`;
+    initVideoPlayer(document.getElementById('admin-live-video'), live.playback_url, 'live', live.id);
+  } else {
+    preview.innerHTML = '<div class="no-video">No live preview — waiting for an IVS stream.</div>';
+  }
+}
+
 async function renderAdmin() {
   if (state.user?.role !== 'admin') return renderLive();
   stopAdminRefresh();
@@ -428,21 +618,23 @@ async function renderAdmin() {
   let data;
   try { data = await adminData(); } catch (error) { return alert(error.message); }
   state.live = data.live || state.live;
+  state.liveStreams = data.liveStreams || [];
+  state._lastLiveIds = (state.liveStreams || []).map((s) => s.id).sort().join(',');
 
   app.innerHTML = shell(`
     <section class="admin-page">
       <div class="admin-heading"><div><p class="eyebrow">Administration</p><h2>Portal Control Center</h2></div><span class="admin-status">REAL DATA</span></div>
 
       <section class="portal-card">
-        <h3>Live Broadcast</h3>
-        <form id="live-settings-form" class="portal-form form-grid">
-          <input type="hidden" id="live-id" value="${escapeHtml(data.live?.id || '')}" />
-          <label>Title<input id="live-title" value="${escapeHtml(data.live?.title || 'Sherwin-Williams Driver Live Stream')}" required /></label>
-          <label>Subtitle<input id="live-subtitle" value="${escapeHtml(data.live?.subtitle || '')}" /></label>
-          <label class="wide-field">Amazon IVS Playback URL<input id="live-url" value="${escapeHtml(data.live?.playback_url || '')}" required /></label>
-          <label>Status<select id="live-status"><option value="live" ${data.live?.status === 'live' ? 'selected' : ''}>Live</option><option value="offline" ${data.live?.status === 'offline' ? 'selected' : ''}>Off Air</option><option value="scheduled" ${data.live?.status === 'scheduled' ? 'selected' : ''}>Scheduled</option><option value="ended" ${data.live?.status === 'ended' ? 'selected' : ''}>Ended</option></select></label>
-          <div class="form-action"><button class="primary-button" type="submit">Save Broadcast</button></div>
-        </form>
+        <div class="admin-section-title">
+          <div>
+            <h3>Live Streams</h3>
+            <p>Auto-detected from AWS IVS. When a channel goes live it appears here. Click a stream to select and preview it.</p>
+          </div>
+          <button type="button" id="refresh-live-streams" class="secondary-button">Refresh</button>
+        </div>
+        <div id="admin-live-streams" class="live-stream-list"></div>
+        <div id="admin-live-preview" class="admin-live-preview"></div>
       </section>
 
       <section class="portal-card">
@@ -465,31 +657,38 @@ async function renderAdmin() {
       </section>
 
       <section class="portal-card">
-        <h3>Upload Edited Recording</h3>
-        <p>Trim the beginning and ending locally, then upload the finished video or audio file here.</p>
-        <form id="media-upload-form" class="portal-form form-grid">
-          <label>Title<input id="media-title" required /></label>
-          <label>Type<select id="media-type"><option value="video">Video</option><option value="audio">Audio</option></select></label>
-          <label>Recording Date<input id="media-date" type="datetime-local" /></label>
-          <label>Status<select id="media-status"><option value="published">Publish Immediately</option><option value="draft">Save as Draft</option></select></label>
-          <label class="wide-field">Description<textarea id="media-description" rows="3"></textarea></label>
-          <label class="wide-field">Media File<input id="media-file" type="file" accept="video/*,audio/*" required /></label>
-          <div class="wide-field"><div id="upload-progress" class="upload-progress"></div></div>
-          <div class="form-action"><button class="primary-button" type="submit">Upload Recording</button></div>
+        <h3>Trim Archive Recording</h3>
+        <p>Admin-only: keep a time range from an IVS recording playlist and replace it in S3. Original playlist is backed up first.</p>
+        <form id="media-trim-form" class="portal-form form-grid">
+          <label class="wide-field">Recording
+            <select id="trim-media" required>
+              <option value="">Select a recording…</option>
+              ${(data.media || []).map((item) => `<option value="${escapeHtml(item.playback_key || '')}">${escapeHtml(item.title)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Start (seconds)<input id="trim-start" type="number" min="0" step="1" value="0" required /></label>
+          <label>End (seconds)<input id="trim-end" type="number" min="1" step="1" value="60" required /></label>
+          <label class="wide-field"><input id="trim-replace" type="checkbox" checked /> Replace original playlist in S3</label>
+          <div class="wide-field"><div id="trim-progress" class="upload-progress"></div></div>
+          <div class="form-action"><button class="primary-button" type="submit">Trim & Save</button></div>
         </form>
-        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Title</th><th>Type</th><th>Date</th><th>Status</th><th>Size</th><th>Action</th></tr></thead><tbody>${(data.media || []).map(item => `<tr><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.media_type)}</td><td>${escapeHtml(new Date(item.recorded_at).toLocaleDateString())}</td><td>${escapeHtml(item.status)}</td><td>${item.size_bytes ? `${(item.size_bytes / 1048576).toFixed(1)} MB` : ''}</td><td><button class="table-action" data-media-id="${item.id}" data-media-status="${item.status === 'published' ? 'archived' : 'published'}">${item.status === 'published' ? 'Archive' : 'Publish'}</button></td></tr>`).join('')}</tbody></table></div>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Title</th><th>Type</th><th>Date</th><th>Path</th></tr></thead><tbody>${(data.media || []).map(item => `<tr><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.media_type)}</td><td>${escapeHtml(new Date(item.recorded_at).toLocaleDateString())}</td><td>${escapeHtml(item.playback_key || item.storage_path || '')}</td></tr>`).join('')}</tbody></table></div>
       </section>
     </section>
   `, 'admin');
   wireShell();
+  fillAdminLiveStreams();
+  startLivePoll();
 
-  document.getElementById('live-settings-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
+  document.getElementById('refresh-live-streams')?.addEventListener('click', async () => {
     try {
-      await api('/api/admin', { method: 'POST', body: JSON.stringify({ action: 'save-live', id: document.getElementById('live-id').value || null, title: document.getElementById('live-title').value, subtitle: document.getElementById('live-subtitle').value, playbackUrl: document.getElementById('live-url').value, status: document.getElementById('live-status').value, startedAt: data.live?.started_at || null }) });
-      await loadContent();
-      alert('Live broadcast settings saved.');
-    } catch (error) { alert(error.message); }
+      const fresh = await adminData();
+      state.live = fresh.live;
+      state.liveStreams = fresh.liveStreams || [];
+      fillAdminLiveStreams();
+    } catch (error) {
+      alert(error.message);
+    }
   });
 
   document.getElementById('create-driver-form').addEventListener('submit', async (event) => {
@@ -517,43 +716,26 @@ async function renderAdmin() {
     } catch (error) { alert(error.message); }
   }));
 
-  document.querySelectorAll('[data-media-id]').forEach(button => button.addEventListener('click', async () => {
-    try {
-      await api('/api/admin', { method: 'POST', body: JSON.stringify({ action: 'set-media-status', mediaId: button.dataset.mediaId, status: button.dataset.mediaStatus }) });
-      await loadContent();
-      renderAdmin();
-    } catch (error) { alert(error.message); }
-  }));
-
-  document.getElementById('media-upload-form').addEventListener('submit', async (event) => {
+  document.getElementById('media-trim-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const file = document.getElementById('media-file').files[0];
-    if (!file) return;
-    const progress = document.getElementById('upload-progress');
+    const progress = document.getElementById('trim-progress');
     const submit = event.currentTarget.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
-      progress.textContent = 'Creating secure upload URL…';
-      const signed = await api('/api/admin', { method: 'POST', body: JSON.stringify({ action: 'sign-upload', fileName: file.name, mediaType: document.getElementById('media-type').value }) });
-      progress.textContent = `Uploading ${(file.size / 1048576).toFixed(1)} MB…`;
-      const upload = await fetch(signed.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
-      if (!upload.ok) throw new Error(`Upload failed (${upload.status}).`);
-      progress.textContent = 'Saving recording information…';
-      await api('/api/admin', { method: 'POST', body: JSON.stringify({
-        action: 'finalize-media',
-        title: document.getElementById('media-title').value,
-        description: document.getElementById('media-description').value,
-        mediaType: document.getElementById('media-type').value,
-        storagePath: signed.path,
-        originalName: file.name,
-        mimeType: file.type,
-        sizeBytes: file.size,
-        recordedAt: document.getElementById('media-date').value ? new Date(document.getElementById('media-date').value).toISOString() : new Date().toISOString(),
-        status: document.getElementById('media-status').value
-      }) });
-      progress.textContent = 'Upload complete.';
+      progress.textContent = 'Trimming playlist in S3…';
+      const result = await api('/api/admin', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'trim-media',
+          playbackKey: document.getElementById('trim-media').value,
+          startSeconds: Number(document.getElementById('trim-start').value),
+          endSeconds: Number(document.getElementById('trim-end').value),
+          replaceOriginal: document.getElementById('trim-replace').checked
+        })
+      });
+      progress.textContent = `Saved. Backup: ${result.backupKey}`;
       await loadContent();
-      setTimeout(() => renderAdmin(), 500);
+      alert('Trim complete. Archive will use the updated playlist.');
     } catch (error) {
       progress.textContent = error.message;
     } finally {

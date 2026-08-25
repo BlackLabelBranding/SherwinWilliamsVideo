@@ -32,6 +32,7 @@ export default function AdminView({
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [trimProgress, setTrimProgress] = useState('');
   const [createBusy, setCreateBusy] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const streams = liveStreams || [];
   const active =
@@ -40,10 +41,20 @@ export default function AdminView({
     streams[0] ||
     live;
 
-  async function loadAdmin() {
-    const data = await api('/api/admin', {}, token);
-    setUsers(data.users || []);
-    return data;
+  async function loadAdmin({ showLoading = true } = {}) {
+    if (showLoading) setUsersLoading(true);
+    const started = Date.now();
+    try {
+      const data = await api('/api/admin', {}, token);
+      setUsers(data.users || []);
+      return data;
+    } finally {
+      if (showLoading) {
+        const wait = 350 - (Date.now() - started);
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        setUsersLoading(false);
+      }
+    }
   }
 
   async function loadMetrics({ showLoading = false } = {}) {
@@ -70,17 +81,22 @@ export default function AdminView({
   }
 
   useEffect(() => {
-    loadAdmin().catch((error) => notify({ message: friendlyError(error), tone: 'error' }));
+    if (user?.role !== 'admin') return undefined;
+    loadAdmin({ showLoading: true }).catch((error) => {
+      setUsersLoading(false);
+      notify({ message: friendlyError(error), tone: 'error' });
+    });
     loadMetrics();
     const timer = setInterval(loadMetrics, 10000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, user?.role]);
 
   async function createUser(event) {
     event.preventDefault();
+    const formEl = event.currentTarget;
     setCreateBusy(true);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formEl);
     try {
       await api(
         '/api/admin',
@@ -97,13 +113,13 @@ export default function AdminView({
         },
         token
       );
-      event.currentTarget.reset();
+      formEl?.reset?.();
       notify({
         title: 'Account created',
-        message: 'Driver account created. They will be required to change the temporary password.',
+        message: 'Account created. The driver must change the temporary password on first login.',
         tone: 'success'
       });
-      await loadAdmin();
+      await loadAdmin({ showLoading: true });
     } catch (error) {
       notify({ message: friendlyError(error), tone: 'error' });
     } finally {
@@ -113,6 +129,7 @@ export default function AdminView({
 
   async function toggleUser(userId, activeFlag) {
     try {
+      setUsersLoading(true);
       await api(
         '/api/admin',
         {
@@ -121,8 +138,9 @@ export default function AdminView({
         },
         token
       );
-      await loadAdmin();
+      await loadAdmin({ showLoading: true });
     } catch (error) {
+      setUsersLoading(false);
       notify({ message: friendlyError(error), tone: 'error' });
     }
   }
@@ -130,10 +148,12 @@ export default function AdminView({
   async function resetPassword(userId) {
     const password = await prompt({
       title: 'Reset password',
-      message: 'Enter a temporary password (minimum 10 characters).',
+      message: 'Enter a new temporary password (minimum 10 characters).',
       inputType: 'password',
       minLength: 10,
-      confirmLabel: 'Reset password'
+      confirmLabel: 'Reset password',
+      loadingTitle: 'Updating password…',
+      loadingMessage: 'Please wait.'
     });
     if (!password) return;
     try {
@@ -143,8 +163,8 @@ export default function AdminView({
         token
       );
       notify({
-        title: 'Password reset',
-        message: 'Password reset. The driver must change it after login.',
+        title: 'Password updated',
+        message: 'Password updated. The driver must change it after login.',
         tone: 'success'
       });
     } catch (error) {
@@ -312,75 +332,98 @@ export default function AdminView({
         <form className="portal-form form-grid" onSubmit={createUser}>
           <label>
             Driver Name
-            <input name="displayName" type="text" required />
+            <input name="displayName" type="text" required disabled={createBusy} />
           </label>
           <label>
             Username
-            <input name="username" type="text" autoComplete="username" required />
+            <input name="username" type="text" autoComplete="username" required disabled={createBusy} />
           </label>
           <label>
             Employee ID
-            <input name="employeeId" type="text" />
+            <input name="employeeId" type="text" disabled={createBusy} />
           </label>
           <label>
             Temporary Password
-            <input name="password" type="password" autoComplete="new-password" minLength={10} required />
+            <input
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              required
+              disabled={createBusy}
+            />
           </label>
           <label>
             Role
-            <select name="role" defaultValue="driver">
+            <select name="role" defaultValue="driver" disabled={createBusy}>
               <option value="driver">Driver</option>
               <option value="admin">Admin</option>
             </select>
           </label>
           <div className="form-action">
             <button className="primary-button" type="submit" disabled={createBusy}>
-              Create Account
+              {createBusy ? 'Creating…' : 'Create Account'}
             </button>
           </div>
         </form>
-        <div className="table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Employee ID</th>
-                <th>Role</th>
-                <th>Last Login</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((row) => (
-                <tr key={row.id || row.username}>
-                  <td>{row.display_name}</td>
-                  <td>{row.username}</td>
-                  <td>{row.employee_id || ''}</td>
-                  <td>{row.role}</td>
-                  <td>{row.last_login_at ? fmtDate(row.last_login_at) : 'Never'}</td>
-                  <td>{row.active ? 'Active' : 'Disabled'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="table-action"
-                      onClick={() => toggleUser(row.id || row.username, row.active)}
-                    >
-                      {row.active ? 'Disable' : 'Enable'}
-                    </button>
-                    <button
-                      type="button"
-                      className="table-action"
-                      onClick={() => resetPassword(row.id || row.username)}
-                    >
-                      Reset Password
-                    </button>
-                  </td>
+        <div className={`users-body ${usersLoading ? 'is-loading' : ''}`}>
+          {usersLoading ? (
+            <div className="section-loading" role="status" aria-live="polite">
+              <span className="section-spinner" />
+              <span>Loading accounts…</span>
+            </div>
+          ) : null}
+          <div className="table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Employee ID</th>
+                  <th>Role</th>
+                  <th>Last Login</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {!usersLoading && !users.length ? (
+                  <tr>
+                    <td colSpan={7}>No accounts yet.</td>
+                  </tr>
+                ) : (
+                  users.map((row) => (
+                    <tr key={row.id || row.username}>
+                      <td>{row.display_name}</td>
+                      <td>{row.username}</td>
+                      <td>{row.employee_id || ''}</td>
+                      <td>{row.role}</td>
+                      <td>{row.last_login_at ? fmtDate(row.last_login_at) : 'Never'}</td>
+                      <td>{row.active ? 'Active' : 'Disabled'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="table-action"
+                          disabled={usersLoading || createBusy}
+                          onClick={() => toggleUser(row.id || row.username, row.active)}
+                        >
+                          {row.active ? 'Disable' : 'Enable'}
+                        </button>
+                        <button
+                          type="button"
+                          className="table-action"
+                          disabled={usersLoading || createBusy}
+                          onClick={() => resetPassword(row.id || row.username)}
+                        >
+                          Reset Password
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

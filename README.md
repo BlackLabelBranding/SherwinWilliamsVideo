@@ -27,8 +27,8 @@ npm start
 
 ## Auth
 
-- `AUTH_MODE=both` (default): Cognito first when configured, then static users
-
+- Cognito + DynamoDB only (`AUTH_MODE=cognito`)
+- Portal admin is created in Cognito / DynamoDB (not static demo users)
 
 ## Features
 

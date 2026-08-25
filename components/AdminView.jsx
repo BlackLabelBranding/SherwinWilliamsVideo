@@ -26,14 +26,13 @@ export default function AdminView({
   onRefreshLive,
   onPlaying
 }) {
-  const { notify, prompt, confirm } = useModal();
+  const { notify, prompt } = useModal();
   const [users, setUsers] = useState([]);
   const [metrics, setMetrics] = useState({ live: {}, active: [] });
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [usersLoading, setUsersLoading] = useState(true);
   const [trimProgress, setTrimProgress] = useState('');
   const [createBusy, setCreateBusy] = useState(false);
-  const [rowBusy, setRowBusy] = useState({});
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const streams = liveStreams || [];
   const active =
@@ -42,23 +41,19 @@ export default function AdminView({
     streams[0] ||
     live;
 
-  function setRowAction(userKey, action) {
-    setRowBusy((prev) => {
-      const next = { ...prev };
-      if (!action) delete next[userKey];
-      else next[userKey] = action;
-      return next;
-    });
-  }
-
-  async function loadAdmin({ showLoading = false } = {}) {
+  async function loadAdmin({ showLoading = true } = {}) {
     if (showLoading) setUsersLoading(true);
+    const started = Date.now();
     try {
       const data = await api('/api/admin', {}, token);
       setUsers(data.users || []);
       return data;
     } finally {
-      if (showLoading) setUsersLoading(false);
+      if (showLoading) {
+        const wait = 350 - (Date.now() - started);
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        setUsersLoading(false);
+      }
     }
   }
 
@@ -98,8 +93,9 @@ export default function AdminView({
 
   async function createUser(event) {
     event.preventDefault();
+    const formEl = event.currentTarget;
     setCreateBusy(true);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formEl);
     try {
       await api(
         '/api/admin',
@@ -116,13 +112,13 @@ export default function AdminView({
         },
         token
       );
-      event.currentTarget.reset();
+      formEl?.reset?.();
       notify({
         title: 'Account created',
         message: 'Driver account created. They will be required to change the temporary password.',
         tone: 'success'
       });
-      await loadAdmin();
+      await loadAdmin({ showLoading: true });
     } catch (error) {
       notify({ message: friendlyError(error), tone: 'error' });
     } finally {
@@ -130,32 +126,25 @@ export default function AdminView({
     }
   }
 
-  async function toggleUser(row) {
-    const userKey = row.id || row.username;
-    setRowAction(userKey, row.active ? 'disable' : 'enable');
+  async function toggleUser(userId, activeFlag) {
     try {
+      setUsersLoading(true);
       await api(
         '/api/admin',
         {
           method: 'POST',
-          body: JSON.stringify({
-            action: 'set-user-active',
-            userId: userKey,
-            active: !row.active
-          })
+          body: JSON.stringify({ action: 'set-user-active', userId, active: !activeFlag })
         },
         token
       );
-      await loadAdmin();
+      await loadAdmin({ showLoading: true });
     } catch (error) {
+      setUsersLoading(false);
       notify({ message: friendlyError(error), tone: 'error' });
-    } finally {
-      setRowAction(userKey, null);
     }
   }
 
-  async function resetPassword(row) {
-    const userKey = row.id || row.username;
+  async function resetPassword(userId) {
     const password = await prompt({
       title: 'Reset password',
       message: 'Enter a temporary password (minimum 10 characters).',
@@ -164,11 +153,10 @@ export default function AdminView({
       confirmLabel: 'Reset password'
     });
     if (!password) return;
-    setRowAction(userKey, 'reset');
     try {
       await api(
         '/api/admin',
-        { method: 'POST', body: JSON.stringify({ action: 'reset-password', userId: userKey, password }) },
+        { method: 'POST', body: JSON.stringify({ action: 'reset-password', userId, password }) },
         token
       );
       notify({
@@ -178,42 +166,6 @@ export default function AdminView({
       });
     } catch (error) {
       notify({ message: friendlyError(error), tone: 'error' });
-    } finally {
-      setRowAction(userKey, null);
-    }
-  }
-
-  async function deleteUser(row) {
-    const userKey = row.id || row.username;
-    if (userKey === user?.username || userKey === user?.id) {
-      notify({ message: 'You cannot delete your own account.', tone: 'error' });
-      return;
-    }
-    const ok = await confirm({
-      title: 'Delete account?',
-      message: `Permanently delete “${row.display_name || row.username}” (${row.username})? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      tone: 'error'
-    });
-    if (!ok) return;
-    setRowAction(userKey, 'delete');
-    try {
-      await api(
-        '/api/admin',
-        { method: 'POST', body: JSON.stringify({ action: 'delete-user', userId: userKey }) },
-        token
-      );
-      notify({
-        title: 'Account deleted',
-        message: `${row.username} has been removed.`,
-        tone: 'success'
-      });
-      await loadAdmin();
-    } catch (error) {
-      notify({ message: friendlyError(error), tone: 'error' });
-    } finally {
-      setRowAction(userKey, null);
     }
   }
 
@@ -415,7 +367,7 @@ export default function AdminView({
           {usersLoading ? (
             <div className="section-loading" role="status" aria-live="polite">
               <span className="section-spinner" />
-              <span>Loading users…</span>
+              <span>Loading accounts…</span>
             </div>
           ) : null}
           <div className="table-wrap">
@@ -434,57 +386,38 @@ export default function AdminView({
               <tbody>
                 {!usersLoading && !users.length ? (
                   <tr>
-                    <td colSpan={7}>No users yet.</td>
+                    <td colSpan={7}>No accounts yet.</td>
                   </tr>
-                ) : null}
-                {users.map((row) => {
-                  const userKey = row.id || row.username;
-                  const busy = rowBusy[userKey];
-                  const isSelf = userKey === user?.username || userKey === user?.id;
-                  return (
-                    <tr key={userKey}>
+                ) : (
+                  users.map((row) => (
+                    <tr key={row.id || row.username}>
                       <td>{row.display_name}</td>
                       <td>{row.username}</td>
                       <td>{row.employee_id || ''}</td>
                       <td>{row.role}</td>
                       <td>{row.last_login_at ? fmtDate(row.last_login_at) : 'Never'}</td>
                       <td>{row.active ? 'Active' : 'Disabled'}</td>
-                      <td className="user-actions">
+                      <td>
                         <button
                           type="button"
                           className="table-action"
-                          disabled={Boolean(busy)}
-                          onClick={() => toggleUser(row)}
+                          disabled={usersLoading || createBusy}
+                          onClick={() => toggleUser(row.id || row.username, row.active)}
                         >
-                          {busy === 'disable'
-                            ? 'Disabling…'
-                            : busy === 'enable'
-                              ? 'Enabling…'
-                              : row.active
-                                ? 'Disable'
-                                : 'Enable'}
+                          {row.active ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           type="button"
                           className="table-action"
-                          disabled={Boolean(busy)}
-                          onClick={() => resetPassword(row)}
+                          disabled={usersLoading || createBusy}
+                          onClick={() => resetPassword(row.id || row.username)}
                         >
-                          {busy === 'reset' ? 'Resetting…' : 'Reset Password'}
-                        </button>
-                        <button
-                          type="button"
-                          className="table-action table-action-danger"
-                          disabled={Boolean(busy) || isSelf}
-                          onClick={() => deleteUser(row)}
-                          title={isSelf ? 'You cannot delete your own account' : 'Delete account'}
-                        >
-                          {busy === 'delete' ? 'Deleting…' : 'Delete'}
+                          Reset Password
                         </button>
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

@@ -216,6 +216,7 @@ function PortalApp() {
       must_change_password: result.must_change_password
     };
     setUser(nextUser);
+    setView('live');
     localStorage.setItem('sw_session_token', result.token);
     setMustChange(Boolean(result.must_change_password));
     if (result.must_change_password) return;
@@ -223,7 +224,6 @@ function PortalApp() {
     setLoadingMessage('Loading portal…');
     try {
       await loadContent(result.token);
-      setView('live');
     } catch (error) {
       setBootError(error.message);
     } finally {
@@ -241,9 +241,11 @@ function PortalApp() {
     setLive(null);
     setLiveStreams([]);
     setMedia([]);
+    setView('live');
     setMustChange(false);
     setChangingPassword(false);
     setContentLoading(false);
+    setBootError('');
     localStorage.removeItem('sw_session_token');
   }
 
@@ -295,6 +297,7 @@ function PortalApp() {
         required={mustChange}
         onLogout={logout}
         onDone={async () => {
+          setView('live');
           setMustChange(false);
           setChangingPassword(false);
           setUser((u) => ({ ...u, must_change_password: false }));
@@ -302,7 +305,6 @@ function PortalApp() {
           setLoadingMessage('Loading portal…');
           try {
             await loadContent();
-            setView('live');
           } catch (error) {
             setBootError(error.message);
           } finally {
@@ -378,7 +380,7 @@ function PortalApp() {
         {view === 'archive' ? (
           <ArchiveView token={token} media={media} onPlaying={startTracking} />
         ) : null}
-        {view === 'admin' ? (
+        {view === 'admin' && user?.role === 'admin' ? (
           <AdminView
             token={token}
             user={user}

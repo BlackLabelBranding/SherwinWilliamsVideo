@@ -81,6 +81,7 @@ export default function AdminView({
   }
 
   useEffect(() => {
+    if (user?.role !== 'admin') return undefined;
     loadAdmin({ showLoading: true }).catch((error) => {
       setUsersLoading(false);
       notify({ message: friendlyError(error), tone: 'error' });
@@ -89,7 +90,7 @@ export default function AdminView({
     const timer = setInterval(loadMetrics, 10000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, user?.role]);
 
   async function createUser(event) {
     event.preventDefault();

@@ -1,4 +1,4 @@
-import { createRequire } from 'module';
+import { createRequire } from 'node:module';
 import { NextResponse } from 'next/server';
 
 const require = createRequire(import.meta.url);

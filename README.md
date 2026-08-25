@@ -28,7 +28,7 @@ npm start
 ## Auth
 
 - `AUTH_MODE=both` (default): Cognito first when configured, then static users
-- Static demo: `admin` / `admin123@#`, `driver1` / `pass123`
+
 
 ## Features
 

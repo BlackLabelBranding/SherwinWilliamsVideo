@@ -115,7 +115,7 @@ export default function AdminView({
       formEl?.reset?.();
       notify({
         title: 'Account created',
-        message: 'Driver account created. They will be required to change the temporary password.',
+        message: 'Account created. The driver must change the temporary password on first login.',
         tone: 'success'
       });
       await loadAdmin({ showLoading: true });
@@ -147,12 +147,12 @@ export default function AdminView({
   async function resetPassword(userId) {
     const password = await prompt({
       title: 'Reset password',
-      message: 'Enter a temporary password (minimum 10 characters).',
+      message: 'Enter a new temporary password (minimum 10 characters).',
       inputType: 'password',
       minLength: 10,
       confirmLabel: 'Reset password',
-      loadingTitle: 'Resetting password…',
-      loadingMessage: 'Updating Cognito credentials. Please wait.'
+      loadingTitle: 'Updating password…',
+      loadingMessage: 'Please wait.'
     });
     if (!password) return;
     try {
@@ -162,8 +162,8 @@ export default function AdminView({
         token
       );
       notify({
-        title: 'Password reset',
-        message: 'Password reset. The driver must change it after login.',
+        title: 'Password updated',
+        message: 'Password updated. The driver must change it after login.',
         tone: 'success'
       });
     } catch (error) {

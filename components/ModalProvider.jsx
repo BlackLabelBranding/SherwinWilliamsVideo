@@ -48,8 +48,8 @@ export function ModalProvider({ children }) {
         inputType: opts.inputType || 'text',
         minLength: opts.minLength,
         confirmLabel: opts.confirmLabel || 'Continue',
-        loadingTitle: opts.loadingTitle || 'Working…',
-        loadingMessage: opts.loadingMessage || 'Please wait…',
+        loadingTitle: opts.loadingTitle || 'Updating…',
+        loadingMessage: opts.loadingMessage || 'Please wait.',
         tone: 'info'
       });
     });
@@ -79,8 +79,8 @@ export function ModalProvider({ children }) {
     // Keep modal visible — switch to loading, then caller notify()/error replaces it.
     setModal((prev) => ({
       mode: 'busy',
-      title: prev?.loadingTitle || 'Working…',
-      message: prev?.loadingMessage || 'Please wait…',
+      title: prev?.loadingTitle || 'Updating…',
+      message: prev?.loadingMessage || 'Please wait.',
       tone: 'info'
     }));
     resolve?.(value);

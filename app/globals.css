@@ -809,6 +809,39 @@ select:focus {
   pointer-events: none;
 }
 
+.users-body {
+  position: relative;
+  min-height: 140px;
+  margin-top: 8px;
+}
+
+.users-body.is-loading {
+  pointer-events: none;
+}
+
+.users-body .table-wrap {
+  margin-top: 8px;
+}
+
+.user-actions {
+  white-space: nowrap;
+}
+
+.table-action:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.table-action-danger {
+  border-color: #f1b4b7;
+  color: #b42318;
+  background: #fff5f5;
+}
+
+.table-action-danger:hover:not(:disabled) {
+  background: #ffe8e9;
+}
+
 .section-loading {
   position: absolute;
   inset: 0;

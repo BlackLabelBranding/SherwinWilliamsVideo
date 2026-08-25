@@ -51,6 +51,20 @@ export function ModalProvider({ children }) {
     });
   }, []);
 
+  const confirm = useCallback((opts = {}) => {
+    return new Promise((resolve) => {
+      resolvePromptRef.current = resolve;
+      setModal({
+        mode: 'confirm',
+        title: opts.title || 'Confirm',
+        message: opts.message || 'Are you sure?',
+        confirmLabel: opts.confirmLabel || 'Confirm',
+        cancelLabel: opts.cancelLabel || 'Cancel',
+        tone: opts.tone || 'error'
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!modal) return undefined;
     const onKey = (event) => {
@@ -76,8 +90,16 @@ export function ModalProvider({ children }) {
     setModal(null);
   }
 
+  function acceptConfirm() {
+    if (resolvePromptRef.current) {
+      resolvePromptRef.current(true);
+      resolvePromptRef.current = null;
+    }
+    setModal(null);
+  }
+
   return (
-    <ModalContext.Provider value={{ notify, prompt }}>
+    <ModalContext.Provider value={{ notify, prompt, confirm }}>
       {children}
       {modal ? (
         <div className="app-modal-backdrop" role="presentation" onClick={close}>
@@ -88,7 +110,15 @@ export function ModalProvider({ children }) {
             aria-labelledby={titleId}
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="app-modal-eyebrow">{modal.tone === 'success' ? 'Done' : modal.tone === 'info' ? 'Action' : 'Alert'}</p>
+            <p className="app-modal-eyebrow">
+              {modal.mode === 'confirm'
+                ? 'Confirm'
+                : modal.tone === 'success'
+                  ? 'Done'
+                  : modal.tone === 'info'
+                    ? 'Action'
+                    : 'Alert'}
+            </p>
             <h2 id={titleId}>{modal.title}</h2>
             {modal.message ? <p className="app-modal-message">{modal.message}</p> : null}
 
@@ -114,6 +144,15 @@ export function ModalProvider({ children }) {
                   </button>
                 </div>
               </form>
+            ) : modal.mode === 'confirm' ? (
+              <div className="app-modal-actions">
+                <button type="button" className="secondary-button" onClick={close}>
+                  {modal.cancelLabel || 'Cancel'}
+                </button>
+                <button type="button" className="primary-button" onClick={acceptConfirm} autoFocus>
+                  {modal.confirmLabel || 'Confirm'}
+                </button>
+              </div>
             ) : (
               <div className="app-modal-actions">
                 <button type="button" className="primary-button" onClick={close} autoFocus>

@@ -300,6 +300,24 @@ select:focus {
   flex-wrap: wrap;
 }
 
+.app-modal-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 6px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+}
+
+.app-modal--busy {
+  pointer-events: none;
+}
+
+.app-modal-loading .section-spinner {
+  border-color: rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+}
+
 .error-message {
   margin-top: 12px;
   color: #ffd6d9;
@@ -317,17 +335,24 @@ select:focus {
 }
 
 .nav {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 20;
+  left: 0;
+  right: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  background: rgba(0, 32, 70, 0.96);
+  background: rgba(0, 32, 70, 0.98);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
+}
+
+.nav-spacer {
+  height: 64px;
+  flex-shrink: 0;
 }
 
 .nav-brand {

@@ -15,14 +15,16 @@ export function ModalProvider({ children }) {
   const resolvePromptRef = useRef(null);
   const inputRef = useRef(null);
   const titleId = useId();
+  const busy = modal?.mode === 'busy';
 
   const close = useCallback(() => {
+    if (busy) return;
     if (resolvePromptRef.current) {
       resolvePromptRef.current(null);
       resolvePromptRef.current = null;
     }
     setModal(null);
-  }, []);
+  }, [busy]);
 
   const notify = useCallback((opts) => {
     const payload = typeof opts === 'string' ? { message: opts } : opts || {};
@@ -46,21 +48,9 @@ export function ModalProvider({ children }) {
         inputType: opts.inputType || 'text',
         minLength: opts.minLength,
         confirmLabel: opts.confirmLabel || 'Continue',
+        loadingTitle: opts.loadingTitle || 'Working…',
+        loadingMessage: opts.loadingMessage || 'Please wait…',
         tone: 'info'
-      });
-    });
-  }, []);
-
-  const confirm = useCallback((opts = {}) => {
-    return new Promise((resolve) => {
-      resolvePromptRef.current = resolve;
-      setModal({
-        mode: 'confirm',
-        title: opts.title || 'Confirm',
-        message: opts.message || 'Are you sure?',
-        confirmLabel: opts.confirmLabel || 'Confirm',
-        cancelLabel: opts.cancelLabel || 'Cancel',
-        tone: opts.tone || 'error'
       });
     });
   }, []);
@@ -68,7 +58,7 @@ export function ModalProvider({ children }) {
   useEffect(() => {
     if (!modal) return undefined;
     const onKey = (event) => {
-      if (event.key === 'Escape') close();
+      if (event.key === 'Escape' && modal.mode !== 'busy') close();
     };
     window.addEventListener('keydown', onKey);
     if (modal.mode === 'prompt') {
@@ -79,48 +69,52 @@ export function ModalProvider({ children }) {
 
   function submitPrompt(event) {
     event.preventDefault();
+    if (busy) return;
     const value = String(new FormData(event.currentTarget).get('value') || '');
     if (modal?.minLength && value.length < modal.minLength) {
       return;
     }
-    if (resolvePromptRef.current) {
-      resolvePromptRef.current(value);
-      resolvePromptRef.current = null;
-    }
-    setModal(null);
-  }
-
-  function acceptConfirm() {
-    if (resolvePromptRef.current) {
-      resolvePromptRef.current(true);
-      resolvePromptRef.current = null;
-    }
-    setModal(null);
+    const resolve = resolvePromptRef.current;
+    resolvePromptRef.current = null;
+    // Keep modal visible — switch to loading, then caller notify()/error replaces it.
+    setModal((prev) => ({
+      mode: 'busy',
+      title: prev?.loadingTitle || 'Working…',
+      message: prev?.loadingMessage || 'Please wait…',
+      tone: 'info'
+    }));
+    resolve?.(value);
   }
 
   return (
-    <ModalContext.Provider value={{ notify, prompt, confirm }}>
+    <ModalContext.Provider value={{ notify, prompt }}>
       {children}
       {modal ? (
-        <div className="app-modal-backdrop" role="presentation" onClick={close}>
+        <div
+          className="app-modal-backdrop"
+          role="presentation"
+          onClick={busy ? undefined : close}
+        >
           <div
-            className={`app-modal app-modal--${modal.tone || 'error'}`}
+            className={`app-modal app-modal--${modal.tone || 'error'}${busy ? ' app-modal--busy' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
+            aria-busy={busy ? 'true' : undefined}
             onClick={(event) => event.stopPropagation()}
           >
             <p className="app-modal-eyebrow">
-              {modal.mode === 'confirm'
-                ? 'Confirm'
-                : modal.tone === 'success'
-                  ? 'Done'
-                  : modal.tone === 'info'
-                    ? 'Action'
-                    : 'Alert'}
+              {busy ? 'Please wait' : modal.tone === 'success' ? 'Done' : modal.tone === 'info' ? 'Action' : 'Alert'}
             </p>
             <h2 id={titleId}>{modal.title}</h2>
             {modal.message ? <p className="app-modal-message">{modal.message}</p> : null}
+
+            {modal.mode === 'busy' ? (
+              <div className="app-modal-loading" role="status">
+                <span className="section-spinner" />
+                <span>Processing…</span>
+              </div>
+            ) : null}
 
             {modal.mode === 'prompt' ? (
               <form className="app-modal-form" onSubmit={submitPrompt}>
@@ -144,22 +138,15 @@ export function ModalProvider({ children }) {
                   </button>
                 </div>
               </form>
-            ) : modal.mode === 'confirm' ? (
-              <div className="app-modal-actions">
-                <button type="button" className="secondary-button" onClick={close}>
-                  {modal.cancelLabel || 'Cancel'}
-                </button>
-                <button type="button" className="primary-button" onClick={acceptConfirm} autoFocus>
-                  {modal.confirmLabel || 'Confirm'}
-                </button>
-              </div>
-            ) : (
+            ) : null}
+
+            {modal.mode === 'alert' ? (
               <div className="app-modal-actions">
                 <button type="button" className="primary-button" onClick={close} autoFocus>
                   OK
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       ) : null}

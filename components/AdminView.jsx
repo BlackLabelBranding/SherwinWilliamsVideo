@@ -150,7 +150,9 @@ export default function AdminView({
       message: 'Enter a temporary password (minimum 10 characters).',
       inputType: 'password',
       minLength: 10,
-      confirmLabel: 'Reset password'
+      confirmLabel: 'Reset password',
+      loadingTitle: 'Resetting password…',
+      loadingMessage: 'Updating Cognito credentials. Please wait.'
     });
     if (!password) return;
     try {

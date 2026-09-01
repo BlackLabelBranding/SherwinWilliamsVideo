@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { StreamList } from '@/components/LiveView';
 import { friendlyError, useModal } from '@/components/ModalProvider';
+import TrimRecordingPanel from '@/components/TrimRecordingPanel';
 import { api, fmtDate, fmtDuration } from '@/lib/client';
 
 function MetricCard({ value, label }) {
@@ -22,6 +23,8 @@ export default function AdminView({
   liveStreams,
   selectedLiveId,
   media,
+  mediaVersions = {},
+  onTrimComplete,
   onSelectStream,
   onRefreshLive,
   onPlaying
@@ -30,7 +33,6 @@ export default function AdminView({
   const [users, setUsers] = useState([]);
   const [metrics, setMetrics] = useState({ live: {}, active: [] });
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [trimProgress, setTrimProgress] = useState('');
   const [createBusy, setCreateBusy] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
 
@@ -168,37 +170,6 @@ export default function AdminView({
         tone: 'success'
       });
     } catch (error) {
-      notify({ message: friendlyError(error), tone: 'error' });
-    }
-  }
-
-  async function trimMedia(event) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setTrimProgress('Trimming playlist in S3…');
-    try {
-      const result = await api(
-        '/api/admin',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'trim-media',
-            playbackKey: form.get('playbackKey'),
-            startSeconds: Number(form.get('startSeconds')),
-            endSeconds: Number(form.get('endSeconds')),
-            replaceOriginal: form.get('replaceOriginal') === 'on'
-          })
-        },
-        token
-      );
-      setTrimProgress(`Saved. Backup: ${result.backupKey}`);
-      notify({
-        title: 'Trim complete',
-        message: 'Archive will use the updated playlist.',
-        tone: 'success'
-      });
-    } catch (error) {
-      setTrimProgress(friendlyError(error));
       notify({ message: friendlyError(error), tone: 'error' });
     }
   }
@@ -433,39 +404,12 @@ export default function AdminView({
           Admin-only: keep a time range from an IVS recording playlist and replace it in S3. Original
           playlist is backed up first.
         </p>
-        <form className="portal-form form-grid" onSubmit={trimMedia}>
-          <label className="wide-field">
-            Recording
-            <select name="playbackKey" required defaultValue="">
-              <option value="">Select a recording…</option>
-              {(media || []).map((item) => (
-                <option key={item.id} value={item.playback_key || ''}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Start (seconds)
-            <input name="startSeconds" type="number" min={0} step={1} defaultValue={0} required />
-          </label>
-          <label>
-            End (seconds)
-            <input name="endSeconds" type="number" min={1} step={1} defaultValue={60} required />
-          </label>
-          <label className="wide-field checkbox-row">
-            <input name="replaceOriginal" type="checkbox" defaultChecked /> Replace original playlist
-            in S3
-          </label>
-          <div className="wide-field">
-            <div className="upload-progress">{trimProgress}</div>
-          </div>
-          <div className="form-action">
-            <button className="primary-button" type="submit">
-              Trim & Save
-            </button>
-          </div>
-        </form>
+        <TrimRecordingPanel
+          media={media}
+          token={token}
+          mediaVersions={mediaVersions}
+          onTrimComplete={onTrimComplete}
+        />
       </section>
     </section>
   );

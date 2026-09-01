@@ -186,7 +186,6 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
                 className="audio-player"
                 controls
                 preload="metadata"
-                muted
                 src={selectedUrl}
                 onPlaying={() => onPlaying?.('media', selected.id)}
               />
@@ -196,7 +195,6 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
                 url={selectedUrl}
                 contentType="media"
                 contentId={selected.id}
-                muted
                 onPlaying={onPlaying}
               />
             )}

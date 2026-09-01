@@ -205,12 +205,14 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
 
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
+    const onVolumeChange = () => setIsMuted(element.muted);
 
     destroyPlayers(element);
     const begin = () => onPlaying?.(contentType, contentId);
     element.addEventListener('playing', begin, { once: true });
     element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPause);
+    element.addEventListener('volumechange', onVolumeChange);
     element.addEventListener('loadedmetadata', reportDuration);
     element.addEventListener('durationchange', reportDuration);
     element.addEventListener('loadeddata', reportDuration);
@@ -273,6 +275,8 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       const player = window.IVSPlayer.create();
       player.setLiveLowLatencyEnabled?.(true);
       player.attachHTMLVideoElement(element);
+      element.muted = muted;
+      setIsMuted(muted);
       player.load(absoluteUrl);
       safePlay(() => player.play());
       element._ivsPlayer = player;
@@ -284,6 +288,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     return () => {
       element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPause);
+      element.removeEventListener('volumechange', onVolumeChange);
       element.removeEventListener('loadedmetadata', reportDuration);
       element.removeEventListener('durationchange', reportDuration);
       element.removeEventListener('loadeddata', reportDuration);

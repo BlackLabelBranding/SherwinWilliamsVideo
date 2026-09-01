@@ -159,8 +159,12 @@ function PortalApp() {
 
   useEffect(() => {
     patchIvsCompat();
-    const saved = localStorage.getItem('sw_session_token') || '';
-    const savedLive = localStorage.getItem('sw_selected_live_id') || '';
+    let saved = '';
+    let savedLive = '';
+    try {
+      saved = localStorage.getItem('sw_session_token') || '';
+      savedLive = localStorage.getItem('sw_selected_live_id') || '';
+    } catch {}
     setSelectedLiveId(savedLive);
     setLoadingMessage(saved ? 'Restoring your session…' : 'Loading…');
     (async () => {

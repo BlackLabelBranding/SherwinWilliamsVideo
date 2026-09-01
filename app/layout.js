@@ -31,7 +31,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
+      <body cz-shortcut-listen="true">
         {children}
         <PwaRegistration />
         <Script src="https://player.live-video.net/1.53.0/amazon-ivs-player.min.js" strategy="afterInteractive" />

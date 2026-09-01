@@ -694,12 +694,26 @@ select:focus {
 
 .archive-layout {
   grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+}
+
+.archive-list-card {
+  position: sticky;
+  top: 72px;
+  max-height: calc(100vh - 84px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .archive-list {
   display: grid;
   gap: 8px;
   margin-top: 12px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .archive-item {
@@ -1265,6 +1279,16 @@ select:focus {
   .live-grid,
   .archive-layout {
     grid-template-columns: 1fr;
+  }
+
+  .archive-list-card {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .archive-list {
+    max-height: 240px;
   }
 
   .nav {

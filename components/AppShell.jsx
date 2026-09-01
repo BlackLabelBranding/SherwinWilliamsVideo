@@ -8,10 +8,10 @@ export default function AppShell({ user, active, onNavigate, onLogout, onChangeP
       {!hideNav ? (
         <>
           <nav className="nav">
-            <div className="nav-brand">
+            <button type="button" className="nav-brand" onClick={() => onNavigate('live')} aria-label="Go to Live">
               <img src={BRAND_LOGO} alt="" className="nav-logo" />
               <span>Sherwin Safety</span>
-            </div>
+            </button>
             <div className="nav-links">
               <button type="button" className={`nav-item ${active === 'live' ? 'active' : ''}`} onClick={() => onNavigate('live')}>
                 Live

@@ -9,6 +9,16 @@ function fmtClock(seconds) {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
+/** IVS player.play() may return undefined instead of a Promise. */
+function safePlay(playFn) {
+  try {
+    const result = playFn();
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {});
+    }
+  } catch {}
+}
+
 function destroyPlayers(element) {
   if (!element) return;
   if (element._ivsPlayer) {
@@ -117,7 +127,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
   const togglePlay = useCallback(() => {
     const element = ref.current;
     if (!element) return;
-    if (element.paused) element.play().catch(() => {});
+    if (element.paused) safePlay(() => element.play());
     else element.pause();
   }, []);
 
@@ -238,7 +248,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
         hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
           element.muted = muted;
           setIsMuted(muted);
-          element.play().catch(() => {});
+          safePlay(() => element.play());
         });
         hls.on(window.Hls.Events.LEVEL_LOADED, (_, data) => {
           const total = data.details?.totalduration;
@@ -257,14 +267,14 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
         element.muted = muted;
         setIsMuted(muted);
         element.load();
-        element.play().catch(() => {});
+        safePlay(() => element.play());
       }
     } else if (isIvsLive && window.IVSPlayer?.isPlayerSupported) {
       const player = window.IVSPlayer.create();
       player.setLiveLowLatencyEnabled?.(true);
       player.attachHTMLVideoElement(element);
       player.load(absoluteUrl);
-      player.play().catch(() => {});
+      safePlay(() => player.play());
       element._ivsPlayer = player;
     } else {
       element.src = absoluteUrl;

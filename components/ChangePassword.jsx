@@ -4,7 +4,7 @@ import { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { api } from '@/lib/client';
 
-export default function ChangePassword({ token, user, required, onDone, onLogout }) {
+export default function ChangePassword({ token, user, required = false, onDone, onLogout, onNavigate }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -40,9 +40,9 @@ export default function ChangePassword({ token, user, required, onDone, onLogout
   return (
     <AppShell
       user={user}
-      active=""
+      active="password"
       hideNav={required}
-      onNavigate={() => {}}
+      onNavigate={onNavigate || (() => {})}
       onLogout={onLogout}
       onChangePassword={() => {}}
     >

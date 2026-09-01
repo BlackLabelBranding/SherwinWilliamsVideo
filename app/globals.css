@@ -368,6 +368,17 @@ select:focus {
   gap: 8px;
   font-weight: 800;
   letter-spacing: 0.02em;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-brand:hover {
+  opacity: 0.9;
 }
 
 .nav-logo {

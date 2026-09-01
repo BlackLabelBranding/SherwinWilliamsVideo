@@ -295,6 +295,52 @@ function PortalApp() {
     }
   }
 
+  const navigateToView = useCallback(
+    async (next) => {
+      setChangingPassword(false);
+      await endTracking();
+      setView(next);
+      setContentLoading(true);
+      setLoadingMessage(
+        next === 'admin' ? 'Loading admin…' : next === 'archive' ? 'Loading archive…' : 'Loading…'
+      );
+      try {
+        if (next === 'admin') {
+          const data = await api('/api/admin', {}, token);
+          setLive(data.live);
+          setLiveStreams(data.liveStreams || []);
+          setMedia(data.media || []);
+        } else {
+          await loadContent();
+        }
+      } catch (error) {
+        if (error.status === 401) {
+          setLoginMessage('Your session expired. Please sign in again.');
+          await logout();
+        }
+      } finally {
+        setContentLoading(false);
+      }
+    },
+    [endTracking, loadContent, token, logout]
+  );
+
+  async function finishPasswordChange() {
+    setView('live');
+    setMustChange(false);
+    setChangingPassword(false);
+    setUser((u) => ({ ...u, must_change_password: false }));
+    setContentLoading(true);
+    setLoadingMessage('Loading portal…');
+    try {
+      await loadContent();
+    } catch (error) {
+      setBootError(error.message);
+    } finally {
+      setContentLoading(false);
+    }
+  }
+
   if (!ready) {
     return <LoadingScreen message={loadingMessage} />;
   }
@@ -303,28 +349,26 @@ function PortalApp() {
     return <LoginForm message={loginMessage} onSuccess={handleLogin} />;
   }
 
-  if (mustChange || changingPassword) {
+  if (mustChange) {
     return (
       <ChangePassword
         token={token}
         user={user}
-        required={mustChange}
+        required
         onLogout={logout}
-        onDone={async () => {
-          setView('live');
-          setMustChange(false);
-          setChangingPassword(false);
-          setUser((u) => ({ ...u, must_change_password: false }));
-          setContentLoading(true);
-          setLoadingMessage('Loading portal…');
-          try {
-            await loadContent();
-          } catch (error) {
-            setBootError(error.message);
-          } finally {
-            setContentLoading(false);
-          }
-        }}
+        onDone={finishPasswordChange}
+      />
+    );
+  }
+
+  if (changingPassword) {
+    return (
+      <ChangePassword
+        token={token}
+        user={user}
+        onNavigate={navigateToView}
+        onLogout={logout}
+        onDone={finishPasswordChange}
       />
     );
   }
@@ -353,31 +397,7 @@ function PortalApp() {
       <AppShell
         user={user}
         active={view}
-        onNavigate={async (next) => {
-          await endTracking();
-          setView(next);
-          setContentLoading(true);
-          setLoadingMessage(
-            next === 'admin' ? 'Loading admin…' : next === 'archive' ? 'Loading archive…' : 'Loading…'
-          );
-          try {
-            if (next === 'admin') {
-              const data = await api('/api/admin', {}, token);
-              setLive(data.live);
-              setLiveStreams(data.liveStreams || []);
-              setMedia(data.media || []);
-            } else {
-              await loadContent();
-            }
-          } catch (error) {
-            if (error.status === 401) {
-              setLoginMessage('Your session expired. Please sign in again.');
-              await logout();
-            }
-          } finally {
-            setContentLoading(false);
-          }
-        }}
+        onNavigate={navigateToView}
         onLogout={logout}
         onChangePassword={() => setChangingPassword(true)}
       >

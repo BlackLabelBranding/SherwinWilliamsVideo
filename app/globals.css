@@ -38,13 +38,15 @@ select {
 
 button {
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .login-page {
   min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 
 .loading-page {
@@ -171,6 +173,11 @@ select {
   outline: none;
   appearance: none;
   -webkit-appearance: none;
+}
+
+.login-form input {
+  min-height: 48px;
+  font-size: 16px;
 }
 
 .portal-card input,
@@ -1072,6 +1079,22 @@ select:focus {
 }
 
 @media (max-width: 560px) {
+  .login-page {
+    min-height: 100dvh;
+    place-items: start center;
+    overflow-y: auto;
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .login-brand h1 {
+    font-size: 1.4rem;
+  }
+
   .login-card,
   .video-card,
   .chat-card,

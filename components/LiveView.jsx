@@ -7,7 +7,7 @@ import { api, fmtDate } from '@/lib/client';
 
 function StreamList({ streams, activeId, emptyText, onSelect }) {
   if (!streams.length) {
-    return <p className="empty-comments">{emptyText || 'No active streams on AWS IVS right now.'}</p>;
+    return <p className="empty-comments">{emptyText || 'No video playing.'}</p>;
   }
   return (
     <div className="live-stream-list">
@@ -118,9 +118,9 @@ export default function LiveView({
       <div className="video-card">
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">{isLive ? 'Live Now' : 'Broadcast'}</p>
-            <h2>{active?.title || 'Sherwin-Williams Driver Live Stream'}</h2>
-            <p>{active?.subtitle || 'Waiting for an IVS stream to start'}</p>
+            <p className="eyebrow">{isLive ? 'Live Now' : 'Live Stream'}</p>
+            <h2>{isLive ? active?.title || 'Sherwin-Williams Safety Broadcast' : 'Live Stream'}</h2>
+            {isLive && active?.subtitle ? <p>{active.subtitle}</p> : null}
           </div>
           <span className={`live-pill ${isLive ? 'on' : 'off'}`}>{isLive ? 'LIVE' : 'OFF AIR'}</span>
         </div>
@@ -136,7 +136,7 @@ export default function LiveView({
             onPlaying={onPlaying}
           />
         ) : (
-          <div className="no-video">No live video at this time. When streaming starts on AWS IVS, it will appear here automatically.</div>
+          <div className="no-video">No video playing.</div>
         )}
       </div>
       <aside className="chat-card">

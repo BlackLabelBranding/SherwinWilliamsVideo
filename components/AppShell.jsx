@@ -10,7 +10,7 @@ export default function AppShell({ user, active, onNavigate, onLogout, onChangeP
           <nav className="nav">
             <div className="nav-brand">
               <img src={BRAND_LOGO} alt="" className="nav-logo" />
-              <span>SW Live</span>
+              <span>Sherwin Safety</span>
             </div>
             <div className="nav-links">
               <button type="button" className={`nav-item ${active === 'live' ? 'active' : ''}`} onClick={() => onNavigate('live')}>

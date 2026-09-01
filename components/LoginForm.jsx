@@ -35,11 +35,11 @@ export default function LoginForm({ message = '', onSuccess }) {
         <div className="login-brand">
           <img src={BRAND_LOGO} alt="Sherwin-Williams" className="login-logo" />
           <div>
-            <p className="eyebrow">Driver Portal</p>
-            <h1>Sign in</h1>
+            <p className="eyebrow">Safety Video Portal</p>
+            <h1>Sherwin Safety</h1>
           </div>
         </div>
-        <p className="login-hint">Use your assigned account to watch live streams and archive recordings.</p>
+        <p className="login-hint">Sign in with your assigned account to continue.</p>
         <form className="login-form" onSubmit={onSubmit}>
           <label>
             Username

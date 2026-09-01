@@ -1,16 +1,31 @@
 import Script from 'next/script';
+import PwaRegistration from '@/components/PwaRegistration';
 import './globals.css';
 
 export const metadata = {
-  title: 'Sherwin-Williams Live',
-  description: 'Driver live streaming and archive portal',
-  applicationName: 'Sherwin-Williams Live'
+  title: 'Sherwin Safety',
+  description: 'Sherwin-Williams safety video portal',
+  applicationName: 'Sherwin Safety',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }]
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Sherwin Safety'
+  }
 };
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#004990'
+  themeColor: '#004990',
+  interactiveWidget: 'resizes-content'
 };
 
 export default function RootLayout({ children }) {
@@ -18,6 +33,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         {children}
+        <PwaRegistration />
         <Script src="https://player.live-video.net/1.53.0/amazon-ivs-player.min.js" strategy="afterInteractive" />
         <Script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js" strategy="afterInteractive" />
       </body>

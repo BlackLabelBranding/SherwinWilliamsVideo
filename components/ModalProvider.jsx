@@ -13,6 +13,7 @@ function toneTitle(tone) {
 export function ModalProvider({ children }) {
   const [modal, setModal] = useState(null);
   const resolvePromptRef = useRef(null);
+  const resolveConfirmRef = useRef(null);
   const inputRef = useRef(null);
   const titleId = useId();
   const busy = modal?.mode === 'busy';
@@ -22,6 +23,10 @@ export function ModalProvider({ children }) {
     if (resolvePromptRef.current) {
       resolvePromptRef.current(null);
       resolvePromptRef.current = null;
+    }
+    if (resolveConfirmRef.current) {
+      resolveConfirmRef.current(false);
+      resolveConfirmRef.current = null;
     }
     setModal(null);
   }, [busy]);
@@ -51,6 +56,21 @@ export function ModalProvider({ children }) {
         loadingTitle: opts.loadingTitle || 'Updating…',
         loadingMessage: opts.loadingMessage || 'Please wait.',
         tone: 'info'
+      });
+    });
+  }, []);
+
+  const confirm = useCallback((opts = {}) => {
+    return new Promise((resolve) => {
+      resolveConfirmRef.current = resolve;
+      setModal({
+        mode: 'confirm',
+        title: opts.title || 'Confirm',
+        message: opts.message || '',
+        confirmLabel: opts.confirmLabel || 'Confirm',
+        cancelLabel: opts.cancelLabel || 'Cancel',
+        tone: opts.tone || 'info',
+        destructive: Boolean(opts.destructive)
       });
     });
   }, []);
@@ -86,8 +106,16 @@ export function ModalProvider({ children }) {
     resolve?.(value);
   }
 
+  function submitConfirm(confirmed) {
+    if (busy) return;
+    const resolve = resolveConfirmRef.current;
+    resolveConfirmRef.current = null;
+    setModal(null);
+    resolve?.(confirmed);
+  }
+
   return (
-    <ModalContext.Provider value={{ notify, prompt }}>
+    <ModalContext.Provider value={{ notify, prompt, confirm }}>
       {children}
       {modal ? (
         <div
@@ -144,6 +172,22 @@ export function ModalProvider({ children }) {
               <div className="app-modal-actions">
                 <button type="button" className="primary-button" onClick={close} autoFocus>
                   OK
+                </button>
+              </div>
+            ) : null}
+
+            {modal.mode === 'confirm' ? (
+              <div className="app-modal-actions">
+                <button type="button" className="secondary-button" onClick={() => submitConfirm(false)}>
+                  {modal.cancelLabel || 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  className={modal.destructive ? 'danger-button' : 'primary-button'}
+                  onClick={() => submitConfirm(true)}
+                  autoFocus
+                >
+                  {modal.confirmLabel || 'Confirm'}
                 </button>
               </div>
             ) : null}

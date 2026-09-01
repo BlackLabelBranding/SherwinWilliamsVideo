@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { listArchiveRecordings, buildPresignedPlaylist, trimAndReplacePlaylist, ensureBucketCors } = require('./lib/s3-archive');
+const { listArchiveRecordings, buildPresignedPlaylist, trimAndReplacePlaylist, deleteArchiveRecording, ensureBucketCors } = require('./lib/s3-archive');
 const { listActiveLiveStreams, pickLiveEvent } = require('./lib/ivs-live');
 const {
   isCognitoEnabled,
@@ -332,9 +332,9 @@ app.get('/api/hls', async (req, res) => {
   }
 
   try {
-    const file = await buildPresignedPlaylist(String(req.query.key || ''), auth.token);
+    const file = await buildPresignedPlaylist(String(req.query.key || ''), auth.token, req.query.v);
     res.setHeader('Content-Type', file.contentType);
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.send(file.body);
   } catch (error) {
@@ -502,6 +502,20 @@ app.post('/api/admin', async (req, res) => {
         endSeconds: body.endSeconds,
         replaceOriginal: body.replaceOriginal !== false
       });
+      return res.json(result);
+    } catch (error) {
+      const status = error.status || 500;
+      return res.status(status).json({ ok: false, error: error.message });
+    }
+  }
+
+  if (body.action === 'delete-media') {
+    try {
+      const storagePath = String(body.storagePath || '').trim();
+      if (!storagePath) {
+        return res.status(400).json({ ok: false, error: 'Recording path is required.' });
+      }
+      const result = await deleteArchiveRecording(storagePath);
       return res.json(result);
     } catch (error) {
       const status = error.status || 500;

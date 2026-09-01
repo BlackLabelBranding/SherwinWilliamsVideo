@@ -54,6 +54,7 @@ function PortalApp() {
   const [liveStreams, setLiveStreams] = useState([]);
   const [selectedLiveId, setSelectedLiveId] = useState('');
   const [media, setMedia] = useState([]);
+  const [mediaVersions, setMediaVersions] = useState({});
   const [loginMessage, setLoginMessage] = useState('');
   const [mustChange, setMustChange] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -145,6 +146,15 @@ function PortalApp() {
       return result;
     },
     [token]
+  );
+
+  const bumpMediaVersion = useCallback(
+    (playbackKey, version = Date.now()) => {
+      if (!playbackKey) return;
+      setMediaVersions((prev) => ({ ...prev, [playbackKey]: version }));
+      loadContent().catch(() => {});
+    },
+    [loadContent]
   );
 
   useEffect(() => {
@@ -378,7 +388,14 @@ function PortalApp() {
           />
         ) : null}
         {view === 'archive' ? (
-          <ArchiveView token={token} media={media} onPlaying={startTracking} />
+          <ArchiveView
+            token={token}
+            media={media}
+            mediaVersions={mediaVersions}
+            onPlaying={startTracking}
+            isAdmin={user?.role === 'admin'}
+            onMediaChange={loadContent}
+          />
         ) : null}
         {view === 'admin' && user?.role === 'admin' ? (
           <AdminView
@@ -388,6 +405,8 @@ function PortalApp() {
             liveStreams={liveStreams}
             selectedLiveId={selectedLiveId}
             media={media}
+            mediaVersions={mediaVersions}
+            onTrimComplete={bumpMediaVersion}
             onSelectStream={(id) => selectLiveStream(id, true)}
             onRefreshLive={refreshLive}
             onPlaying={startTracking}

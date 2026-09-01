@@ -26,10 +26,11 @@ function destroyPlayers(element) {
 }
 
 function isHlsUrl(url) {
+  const value = String(url || '');
   return (
-    url.includes('playback.live-video.net') ||
-    url.includes('.m3u8') ||
-    url.includes('/api/hls')
+    value.includes('playback.live-video.net') ||
+    value.includes('.m3u8') ||
+    value.includes('/api/hls')
   );
 }
 
@@ -94,7 +95,8 @@ function needsCustomControls(element) {
 }
 
 export default function VideoPlayer({ url, contentType, contentId, muted = false, onPlaying, onDuration }) {
-  const isArchiveHls = url.includes('/api/hls');
+  const playbackUrl = String(url || '');
+  const isArchiveHls = playbackUrl.includes('/api/hls');
   const shellRef = useRef(null);
   const ref = useRef(null);
   const onDurationRef = useRef(onDuration);
@@ -149,7 +151,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || !url) return undefined;
+    if (!element || !playbackUrl) return undefined;
 
     lastReportedDurationRef.current = 0;
     element._manifestDuration = 0;
@@ -206,11 +208,13 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     element.addEventListener('seeking', onTimeUpdate);
     element.addEventListener('seeked', onTimeUpdate);
 
-    const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).toString();
-    const isArchiveProxy = url.includes('/api/hls');
-    const isIvsLive = url.includes('playback.live-video.net');
+    const absoluteUrl = playbackUrl.startsWith('http')
+      ? playbackUrl
+      : new URL(playbackUrl, window.location.origin).toString();
+    const isArchiveProxy = playbackUrl.includes('/api/hls');
+    const isIvsLive = playbackUrl.includes('playback.live-video.net');
 
-    if (isArchiveProxy || (isHlsUrl(url) && !isIvsLive)) {
+    if (isArchiveProxy || (isHlsUrl(playbackUrl) && !isIvsLive)) {
       loadManifestDuration(element, absoluteUrl, reportDuration);
       if (window.Hls?.isSupported()) {
         const hls = new window.Hls({
@@ -278,10 +282,18 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       element.removeEventListener('seeked', onTimeUpdate);
       destroyPlayers(element);
     };
-  }, [url, contentType, contentId, muted, onPlaying, isArchiveHls]);
+  }, [url, playbackUrl, contentType, contentId, muted, onPlaying, isArchiveHls]);
 
   const seekPct = progress.total ? Math.min(100, (progress.current / progress.total) * 100) : 0;
   const showCustomControls = customControls;
+
+  if (!playbackUrl) {
+    return (
+      <div className="video-shell">
+        <div className="no-video">Video unavailable.</div>
+      </div>
+    );
+  }
 
   return (
     <div

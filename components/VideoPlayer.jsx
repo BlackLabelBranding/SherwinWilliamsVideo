@@ -19,6 +19,51 @@ function safePlay(playFn) {
   } catch {}
 }
 
+function patchIvsPlayerPlay(player) {
+  if (!player || typeof player.play !== 'function' || player.__swPlayPatched) return;
+  const originalPlay = player.play.bind(player);
+  player.play = (...args) => {
+    const result = originalPlay(...args);
+    return result && typeof result.catch === 'function' ? result : Promise.resolve(result);
+  };
+  player.__swPlayPatched = true;
+}
+
+function waitFor(check, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    if (check()) {
+      resolve(true);
+      return;
+    }
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (check()) {
+        clearInterval(timer);
+        resolve(true);
+      } else if (Date.now() - started >= timeoutMs) {
+        clearInterval(timer);
+        resolve(false);
+      }
+    }, 80);
+  });
+}
+
+function waitForIvsPlayer() {
+  return waitFor(() => Boolean(window.IVSPlayer?.isPlayerSupported?.()));
+}
+
+function waitForHls() {
+  return waitFor(() => Boolean(window.Hls?.isSupported?.()));
+}
+
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 0 && typeof window !== 'undefined' && window.innerWidth < 1024)
+  );
+}
+
 function destroyPlayers(element) {
   if (!element) return;
   if (element._ivsPlayer) {
@@ -115,6 +160,8 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
   const [playing, setPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(muted);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [needsUserPlay, setNeedsUserPlay] = useState(false);
+  const isLive = contentType === 'live';
 
   useEffect(() => {
     onDurationRef.current = onDuration;
@@ -127,8 +174,13 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
   const togglePlay = useCallback(() => {
     const element = ref.current;
     if (!element) return;
-    if (element.paused) safePlay(() => element.play());
-    else element.pause();
+    if (element.paused) {
+      if (element._ivsPlayer) safePlay(() => element._ivsPlayer.play());
+      else safePlay(() => element.play());
+      setNeedsUserPlay(false);
+    } else {
+      element.pause();
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -169,6 +221,16 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     setCustomControls(isArchiveHls);
     setPlaying(false);
     setProgress({ current: 0, total: 0 });
+    setNeedsUserPlay(false);
+
+    let cancelled = false;
+
+    const markNeedsUserPlay = () => {
+      if (cancelled || !isLive) return;
+      window.setTimeout(() => {
+        if (!cancelled && element.paused) setNeedsUserPlay(true);
+      }, 600);
+    };
 
     const updateUi = () => {
       const total = getEffectiveDuration(element);
@@ -199,11 +261,14 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     };
 
     const onTimeUpdate = () => {
-      clampPlayback(element);
+      if (!isLive) clampPlayback(element);
       updateUi();
     };
 
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      setPlaying(true);
+      setNeedsUserPlay(false);
+    };
     const onPause = () => setPlaying(false);
     const onVolumeChange = () => setIsMuted(element.muted);
 
@@ -226,66 +291,102 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     const isArchiveProxy = playbackUrl.includes('/api/hls');
     const isIvsLive = playbackUrl.includes('playback.live-video.net');
 
-    if (isArchiveProxy || (isHlsUrl(playbackUrl) && !isIvsLive)) {
-      loadManifestDuration(element, absoluteUrl, reportDuration);
-      if (window.Hls?.isSupported()) {
-        const hls = new window.Hls({
-          enableWorker: false,
-          lowLatencyMode: false,
-          startLevel: 0,
-          capLevelToPlayerSize: true,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          manifestLoadingTimeOut: 120000,
-          levelLoadingTimeOut: 120000,
-          fragLoadingTimeOut: 180000,
-          fragLoadingMaxRetry: 6,
-          levelLoadingMaxRetry: 6,
-          xhrSetup: (xhr) => {
-            xhr.withCredentials = false;
-          }
-        });
-        hls.loadSource(absoluteUrl);
-        hls.attachMedia(element);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+    async function setupPlayer() {
+      if (isArchiveProxy || (isHlsUrl(playbackUrl) && !isIvsLive)) {
+        loadManifestDuration(element, absoluteUrl, reportDuration);
+        const hlsReady = await waitForHls();
+        if (cancelled) return;
+        if (hlsReady && window.Hls?.isSupported()) {
+          const hls = new window.Hls({
+            enableWorker: false,
+            lowLatencyMode: false,
+            startLevel: 0,
+            capLevelToPlayerSize: true,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            manifestLoadingTimeOut: 120000,
+            levelLoadingTimeOut: 120000,
+            fragLoadingTimeOut: 180000,
+            fragLoadingMaxRetry: 6,
+            levelLoadingMaxRetry: 6,
+            xhrSetup: (xhr) => {
+              xhr.withCredentials = false;
+            }
+          });
+          hls.loadSource(absoluteUrl);
+          hls.attachMedia(element);
+          hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            if (cancelled) return;
+            element.muted = muted;
+            setIsMuted(muted);
+            safePlay(() => element.play());
+            markNeedsUserPlay();
+          });
+          hls.on(window.Hls.Events.LEVEL_LOADED, (_, data) => {
+            const total = data.details?.totalduration;
+            if (Number.isFinite(total) && total > 0) {
+              applyManifestDuration(element, total, reportDuration);
+            }
+          });
+          hls.on(window.Hls.Events.ERROR, (_, data) => {
+            if (!data?.fatal) return;
+            if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+            else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+          });
+          element._hlsPlayer = hls;
+        } else if (element.canPlayType('application/vnd.apple.mpegurl')) {
+          element.src = absoluteUrl;
           element.muted = muted;
           setIsMuted(muted);
+          element.load();
           safePlay(() => element.play());
-        });
-        hls.on(window.Hls.Events.LEVEL_LOADED, (_, data) => {
-          const total = data.details?.totalduration;
-          if (Number.isFinite(total) && total > 0) {
-            applyManifestDuration(element, total, reportDuration);
-          }
-        });
-        hls.on(window.Hls.Events.ERROR, (_, data) => {
-          if (!data?.fatal) return;
-          if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-          else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-        });
-        element._hlsPlayer = hls;
-      } else if (element.canPlayType('application/vnd.apple.mpegurl')) {
+          markNeedsUserPlay();
+        }
+        return;
+      }
+
+      if (!isIvsLive) {
+        element.src = absoluteUrl;
+        element.load();
+        return;
+      }
+
+      const ivsReady = await waitForIvsPlayer();
+      if (cancelled) return;
+
+      if (ivsReady && window.IVSPlayer?.isPlayerSupported?.()) {
+        const player = window.IVSPlayer.create();
+        patchIvsPlayerPlay(player);
+        if (isMobileDevice()) player.setLiveLowLatencyEnabled?.(false);
+        else player.setLiveLowLatencyEnabled?.(true);
+        player.attachHTMLVideoElement(element);
+        element.muted = muted;
+        setIsMuted(muted);
+        element.setAttribute('playsinline', '');
+        element.setAttribute('webkit-playsinline', '');
+        player.load(absoluteUrl);
+        safePlay(() => player.play());
+        element._ivsPlayer = player;
+        markNeedsUserPlay();
+        return;
+      }
+
+      if (element.canPlayType('application/vnd.apple.mpegurl')) {
         element.src = absoluteUrl;
         element.muted = muted;
         setIsMuted(muted);
         element.load();
         safePlay(() => element.play());
+        markNeedsUserPlay();
       }
-    } else if (isIvsLive && window.IVSPlayer?.isPlayerSupported) {
-      const player = window.IVSPlayer.create();
-      player.setLiveLowLatencyEnabled?.(true);
-      player.attachHTMLVideoElement(element);
-      element.muted = muted;
-      setIsMuted(muted);
-      player.load(absoluteUrl);
-      safePlay(() => player.play());
-      element._ivsPlayer = player;
-    } else {
-      element.src = absoluteUrl;
-      element.load();
     }
 
+    setupPlayer().catch(() => {
+      if (!cancelled && isLive) setNeedsUserPlay(true);
+    });
+
     return () => {
+      cancelled = true;
       element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPause);
       element.removeEventListener('volumechange', onVolumeChange);
@@ -297,7 +398,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       element.removeEventListener('seeked', onTimeUpdate);
       destroyPlayers(element);
     };
-  }, [url, playbackUrl, contentType, contentId, muted, onPlaying, isArchiveHls]);
+  }, [url, playbackUrl, contentType, contentId, muted, onPlaying, isArchiveHls, isLive]);
 
   const seekPct = progress.total ? Math.min(100, (progress.current / progress.total) * 100) : 0;
   const showCustomControls = customControls;
@@ -321,7 +422,16 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
         playsInline
         muted={isMuted}
         preload="metadata"
+        autoPlay={isLive && muted}
       />
+      {needsUserPlay ? (
+        <button type="button" className="video-tap-play" aria-label="Tap to play live stream" onClick={togglePlay}>
+          <span className="video-tap-play-icon" aria-hidden="true">
+            ▶
+          </span>
+          <span>Tap to play</span>
+        </button>
+      ) : null}
       {showCustomControls ? (
         <div className="video-custom-controls">
           <button type="button" className="video-ctrl-btn" aria-label={playing ? 'Pause' : 'Play'} onClick={togglePlay}>

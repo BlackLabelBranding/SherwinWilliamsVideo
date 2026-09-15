@@ -483,6 +483,13 @@ select:focus {
   margin: 0;
 }
 
+.archive-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
 .archive-delete-button {
   flex: 0 0 auto;
   display: inline-flex;
@@ -507,6 +514,20 @@ select:focus {
 .archive-delete-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.archive-delete-button.is-loading:disabled {
+  opacity: 1;
+  cursor: wait;
+}
+
+.archive-download-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(236, 28, 36, 0.25);
+  border-top-color: var(--sw-red);
+  animation: sw-spin 0.75s linear infinite;
 }
 
 .danger-button {

@@ -11,6 +11,7 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!media.length) {
@@ -78,6 +79,68 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
     } catch (error) {
       setCommentBody(value);
       notify({ message: friendlyError(error), tone: 'error' });
+    }
+  }
+
+  function safeDownloadName(title, ext) {
+    const base = String(title || 'recording')
+      .replace(/[^\w\s.-]+/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .slice(0, 80);
+    return `${base || 'recording'}.${ext}`;
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  function triggerUrlDownload(url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  async function downloadRecording() {
+    if (!selected || downloading) return;
+
+    setDownloading(true);
+    try {
+      if (selected.media_type === 'audio') {
+        if (!selectedUrl) throw new Error('Audio URL missing.');
+        const response = await fetch(selectedUrl);
+        if (!response.ok) throw new Error('Failed to download audio.');
+        const blob = await response.blob();
+        triggerBlobDownload(blob, safeDownloadName(selected.title, 'm4a'));
+        return;
+      }
+
+      if (!selected.storage_path || !token) {
+        throw new Error('Recording is not ready to download.');
+      }
+
+      const downloadUrl =
+        `/api/download?key=${encodeURIComponent(selected.storage_path)}` +
+        `&access=${encodeURIComponent(token)}` +
+        `&name=${encodeURIComponent(selected.title || '')}`;
+
+      // Browser streams the file to disk (Content-Disposition from /api/download).
+      triggerUrlDownload(downloadUrl);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    } catch (error) {
+      notify({ message: friendlyError(error) || 'Download failed.', tone: 'error' });
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -157,23 +220,44 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
                   <p className="eyebrow">
                     {selected.media_type === 'audio' ? 'Audio Recording' : 'Archive Video'}
                   </p>
-                  {isAdmin ? (
+                  <div className="archive-actions">
                     <button
                       type="button"
-                      className="archive-delete-button"
-                      aria-label={`Delete ${selected.title}`}
-                      title="Delete recording"
-                      disabled={deleting}
-                      onClick={deleteRecording}
+                      className={`archive-delete-button${downloading ? ' is-loading' : ''}`}
+                      aria-label={downloading ? 'Downloading recording' : `Download ${selected.title}`}
+                      title={downloading ? 'Downloading…' : 'Download recording'}
+                      disabled={downloading}
+                      onClick={downloadRecording}
                     >
-                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                        />
-                      </svg>
+                      {downloading ? (
+                        <span className="archive-download-spinner" aria-hidden="true" />
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                          />
+                        </svg>
+                      )}
                     </button>
-                  ) : null}
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        className="archive-delete-button"
+                        aria-label={`Delete ${selected.title}`}
+                        title="Delete recording"
+                        disabled={deleting}
+                        onClick={deleteRecording}
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                          />
+                        </svg>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <h2>{selected.title}</h2>
                 <p>{new Date(selected.recorded_at).toLocaleDateString()}</p>

@@ -483,6 +483,13 @@ select:focus {
   margin: 0;
 }
 
+.archive-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
 .archive-delete-button {
   flex: 0 0 auto;
   display: inline-flex;
@@ -507,6 +514,20 @@ select:focus {
 .archive-delete-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.archive-delete-button.is-loading:disabled {
+  opacity: 1;
+  cursor: wait;
+}
+
+.archive-download-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(236, 28, 36, 0.25);
+  border-top-color: var(--sw-red);
+  animation: sw-spin 0.75s linear infinite;
 }
 
 .danger-button {
@@ -571,6 +592,38 @@ select:focus {
   border-radius: 14px;
   background: #001a38;
   border: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.video-tap-play {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(0, 26, 56, 0.62);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.video-tap-play-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--sw-red);
+  font-size: 22px;
+  line-height: 1;
 }
 
 .video-shell video {

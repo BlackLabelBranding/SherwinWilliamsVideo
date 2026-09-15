@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { listArchiveRecordings, buildPresignedPlaylist, trimAndReplacePlaylist, deleteArchiveRecording, ensureBucketCors } = require('./lib/s3-archive');
+const { listArchiveRecordings, buildPresignedPlaylist, trimAndReplacePlaylist, deleteArchiveRecording, buildArchiveDownload, ensureBucketCors } = require('./lib/s3-archive');
 const { listActiveLiveStreams, pickLiveEvent } = require('./lib/ivs-live');
 const {
   isCognitoEnabled,
@@ -340,6 +340,29 @@ app.get('/api/hls', async (req, res) => {
   } catch (error) {
     const status = error.status || error.$metadata?.httpStatusCode || 500;
     res.status(status).json({ ok: false, error: error.message || 'Failed to build playlist.' });
+  }
+});
+
+app.get('/api/download', async (req, res) => {
+  const auth = sessionFromAccess(req.query.access);
+  if (!auth) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+
+  try {
+    const { Readable } = require('stream');
+    const file = await buildArchiveDownload(String(req.query.key || ''), req.query.name || '');
+    Object.entries(file.headers || {}).forEach(([header, value]) => {
+      res.setHeader(header, value);
+    });
+    return Readable.fromWeb(file.stream).pipe(res);
+  } catch (error) {
+    const status = error.status || error.$metadata?.httpStatusCode || 500;
+    if (!res.headersSent) {
+      res.status(status).json({ ok: false, error: error.message || 'Failed to download recording.' });
+    } else {
+      res.destroy(error);
+    }
   }
 });
 

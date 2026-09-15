@@ -35,8 +35,8 @@ export default function RootLayout({ children }) {
       <body cz-shortcut-listen="true">
         {children}
         <PwaRegistration />
-        <Script src="https://player.live-video.net/1.53.0/amazon-ivs-player.min.js" strategy="afterInteractive" />
-        <Script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js" strategy="afterInteractive" />
+        <Script src="https://player.live-video.net/1.53.0/amazon-ivs-player.min.js" strategy="beforeInteractive" />
+        <Script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js" strategy="beforeInteractive" />
       </body>
     </html>
   );

@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { StreamList } from '@/components/LiveView';
 import { friendlyError, useModal } from '@/components/ModalProvider';
 import TrimRecordingPanel from '@/components/TrimRecordingPanel';
 import { api, fmtDate, fmtDuration } from '@/lib/client';
+
+const DRIVERS_PAGE_SIZE = 10;
 
 function MetricCard({ value, label }) {
   return (
@@ -35,6 +37,9 @@ export default function AdminView({
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
 
   const streams = liveStreams || [];
   const active =
@@ -42,6 +47,31 @@ export default function AdminView({
     (live?.status === 'live' && live?.playback_url ? live : null) ||
     streams[0] ||
     live;
+
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((row) => {
+      const status = row.active ? 'active' : 'disabled';
+      const haystack = [
+        row.display_name,
+        row.username,
+        row.employee_id,
+        row.role,
+        status
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+      return haystack.includes(query);
+    });
+  }, [users, userSearch]);
+
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / DRIVERS_PAGE_SIZE));
+  const safeUserPage = Math.min(userPage, totalUserPages);
+  const pagedUsers = filteredUsers.slice(
+    (safeUserPage - 1) * DRIVERS_PAGE_SIZE,
+    safeUserPage * DRIVERS_PAGE_SIZE
+  );
 
   async function loadAdmin({ showLoading = true } = {}) {
     if (showLoading) setUsersLoading(true);
@@ -94,6 +124,10 @@ export default function AdminView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user?.role]);
 
+  useEffect(() => {
+    setUserPage(1);
+  }, [userSearch]);
+
   async function createUser(event) {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -116,9 +150,10 @@ export default function AdminView({
         token
       );
       formEl?.reset?.();
+      setShowCreateModal(false);
       notify({
         title: 'Account created',
-        message: 'Account created. The driver must change the temporary password on first login.',
+        message: 'Account created. The driver can sign in with the password you set.',
         tone: 'success'
       });
       await loadAdmin({ showLoading: true });
@@ -150,7 +185,7 @@ export default function AdminView({
   async function resetPassword(userId) {
     const password = await prompt({
       title: 'Reset password',
-      message: 'Enter a new temporary password (minimum 10 characters).',
+      message: 'Enter a new password (minimum 10 characters).',
       inputType: 'password',
       minLength: 10,
       confirmLabel: 'Reset password',
@@ -166,7 +201,7 @@ export default function AdminView({
       );
       notify({
         title: 'Password updated',
-        message: 'Password updated. The driver must change it after login.',
+        message: 'Password updated. The driver can sign in with the new password.',
         tone: 'success'
       });
     } catch (error) {
@@ -300,43 +335,24 @@ export default function AdminView({
             <p>Create individual accounts so analytics identify each driver.</p>
           </div>
         </div>
-        <form className="portal-form form-grid" onSubmit={createUser}>
-          <label>
-            Driver Name
-            <input name="displayName" type="text" required disabled={createBusy} />
-          </label>
-          <label>
-            Username
-            <input name="username" type="text" autoComplete="username" required disabled={createBusy} />
-          </label>
-          <label>
-            Employee ID
-            <input name="employeeId" type="text" disabled={createBusy} />
-          </label>
-          <label>
-            Temporary Password
-            <input
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              minLength={10}
-              required
-              disabled={createBusy}
-            />
-          </label>
-          <label>
-            Role
-            <select name="role" defaultValue="driver" disabled={createBusy}>
-              <option value="driver">Driver</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-          <div className="form-action">
-            <button className="primary-button" type="submit" disabled={createBusy}>
-              {createBusy ? 'Creating…' : 'Create Account'}
-            </button>
-          </div>
-        </form>
+        <div className="drivers-toolbar">
+          <input
+            className="drivers-search"
+            type="search"
+            value={userSearch}
+            onChange={(event) => setUserSearch(event.target.value)}
+            placeholder="Search by name, username, employee ID, role, or status…"
+            aria-label="Search driver accounts"
+          />
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => setShowCreateModal(true)}
+            disabled={createBusy}
+          >
+            Create Account
+          </button>
+        </div>
         <div className={`users-body ${usersLoading ? 'is-loading' : ''}`}>
           {usersLoading ? (
             <div className="section-loading" role="status" aria-live="polite">
@@ -344,7 +360,7 @@ export default function AdminView({
               <span>Loading accounts…</span>
             </div>
           ) : null}
-          <div className="table-wrap">
+          <div className="table-wrap drivers-table-scroll">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -358,12 +374,12 @@ export default function AdminView({
                 </tr>
               </thead>
               <tbody>
-                {!usersLoading && !users.length ? (
+                {!usersLoading && !filteredUsers.length ? (
                   <tr>
-                    <td colSpan={7}>No accounts yet.</td>
+                    <td colSpan={7}>{users.length ? 'No matching accounts.' : 'No accounts yet.'}</td>
                   </tr>
                 ) : (
-                  users.map((row) => (
+                  pagedUsers.map((row) => (
                     <tr key={row.id || row.username}>
                       <td>{row.display_name}</td>
                       <td>{row.username}</td>
@@ -395,6 +411,35 @@ export default function AdminView({
               </tbody>
             </table>
           </div>
+          {!usersLoading && filteredUsers.length > 0 ? (
+            <div className="drivers-pagination">
+              <span>
+                Page {safeUserPage} of {totalUserPages}
+                <span className="drivers-pagination-count">
+                  {' '}
+                  · {filteredUsers.length} account{filteredUsers.length === 1 ? '' : 's'}
+                </span>
+              </span>
+              <div className="drivers-pagination-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={safeUserPage <= 1}
+                  onClick={() => setUserPage((page) => Math.max(1, page - 1))}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={safeUserPage >= totalUserPages}
+                  onClick={() => setUserPage((page) => Math.min(totalUserPages, page + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -411,6 +456,72 @@ export default function AdminView({
           onTrimComplete={onTrimComplete}
         />
       </section>
+
+      {showCreateModal ? (
+        <div
+          className="app-modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!createBusy) setShowCreateModal(false);
+          }}
+        >
+          <div
+            className="app-modal app-modal--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-account-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="app-modal-eyebrow">Driver Accounts</p>
+            <h2 id="create-account-title">Create Account</h2>
+            <form className="portal-form form-grid create-account-form" onSubmit={createUser}>
+              <label>
+                Driver Name
+                <input name="displayName" type="text" required disabled={createBusy} />
+              </label>
+              <label>
+                Username
+                <input name="username" type="text" autoComplete="username" required disabled={createBusy} />
+              </label>
+              <label>
+                Employee ID
+                <input name="employeeId" type="text" disabled={createBusy} />
+              </label>
+              <label>
+                Password
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={10}
+                  required
+                  disabled={createBusy}
+                />
+              </label>
+              <label>
+                Role
+                <select name="role" defaultValue="driver" disabled={createBusy}>
+                  <option value="driver">Driver</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <div className="form-action create-account-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={createBusy}
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={createBusy}>
+                  {createBusy ? 'Creating…' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

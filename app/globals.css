@@ -325,6 +325,74 @@ select:focus {
   border-top-color: #fff;
 }
 
+.app-modal--form {
+  width: min(560px, 100%);
+}
+
+.create-account-form {
+  margin-top: 8px;
+}
+
+.create-account-form label {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.create-account-form .create-account-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.drivers-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.drivers-search {
+  flex: 1 1 240px;
+  min-width: 0;
+  border: 1px solid #ccd5e0;
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: #fff;
+  color: #111827;
+}
+
+.drivers-table-scroll {
+  max-height: 470px;
+  overflow: auto;
+}
+
+.drivers-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: #293548;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.drivers-pagination-count {
+  color: #5f6b7a;
+  font-weight: 600;
+}
+
+.drivers-pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.drivers-pagination-actions .secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .error-message {
   margin-top: 12px;
   color: #ffd6d9;
@@ -412,11 +480,91 @@ select:focus {
 }
 
 .nav-user {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+}
+
+.nav-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(145deg, #1a5fa8 0%, #0a3a6e 100%);
+  color: #fff;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.84);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.nav-avatar:hover,
+.nav-avatar.is-open {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(236, 28, 36, 0.28);
+}
+
+.nav-user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 130;
+  min-width: 188px;
+  padding: 8px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #dbe4ee;
+  box-shadow: 0 16px 36px rgba(0, 18, 40, 0.28);
+  color: #12345a;
+}
+
+.nav-user-menu-header {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid #e8eef5;
+  margin-bottom: 6px;
+}
+
+.nav-user-menu-header strong {
+  font-size: 13px;
+  color: #003b78;
+}
+
+.nav-user-role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5f6b7a;
+}
+
+.nav-user-menu-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #12345a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 10px;
+  cursor: pointer;
+}
+
+.nav-user-menu-item:hover {
+  background: #f3f7fb;
+}
+
+.nav-user-menu-item--danger {
+  color: var(--sw-red);
 }
 
 .nav-text-btn {
@@ -1385,7 +1533,11 @@ select:focus {
 
   .nav-user {
     width: auto;
-    gap: 4px;
+  }
+
+  .nav-avatar {
+    width: 34px;
+    height: 34px;
     font-size: 12px;
   }
 
@@ -1519,12 +1671,5 @@ select:focus {
   .no-video {
     min-height: 140px;
     font-size: 0.9rem;
-  }
-
-  .nav-user span {
-    max-width: 110px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }

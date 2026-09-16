@@ -180,11 +180,10 @@ function PortalApp() {
         );
         setToken(saved);
         setUser(result.user);
-        setMustChange(Boolean(result.user?.must_change_password));
-        if (!result.user?.must_change_password) {
-          setLoadingMessage('Loading live streams…');
-          await loadContent(saved);
-        }
+        // Hide forced change-password gate; drivers use the password admin set.
+        setMustChange(false);
+        setLoadingMessage('Loading live streams…');
+        await loadContent(saved);
       } catch {
         localStorage.removeItem('sw_session_token');
         setLoginMessage('Your session expired. Please sign in again.');
@@ -232,8 +231,8 @@ function PortalApp() {
     setUser(nextUser);
     setView('live');
     localStorage.setItem('sw_session_token', result.token);
-    setMustChange(Boolean(result.must_change_password));
-    if (result.must_change_password) return;
+    // Hide forced change-password gate; drivers use the password admin set.
+    setMustChange(false);
     setContentLoading(true);
     setLoadingMessage('Loading portal…');
     try {

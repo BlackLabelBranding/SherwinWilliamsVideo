@@ -54,19 +54,19 @@ export default function AppShell({ user, active, onNavigate, onLogout, onChangeP
               <img src={BRAND_LOGO} alt="" className="nav-logo" />
               <span>Sherwin Safety</span>
             </button>
-            <div className="nav-links">
-              <button type="button" className={`nav-item ${active === 'live' ? 'active' : ''}`} onClick={() => onNavigate('live')}>
-                Live
-              </button>
-              <button type="button" className={`nav-item ${active === 'archive' ? 'active' : ''}`} onClick={() => onNavigate('archive')}>
-                Archive
-              </button>
-              {user?.role === 'admin' ? (
+            {user?.role === 'admin' ? (
+              <div className="nav-links">
+                <button type="button" className={`nav-item ${active === 'live' ? 'active' : ''}`} onClick={() => onNavigate('live')}>
+                  Live
+                </button>
+                <button type="button" className={`nav-item ${active === 'archive' ? 'active' : ''}`} onClick={() => onNavigate('archive')}>
+                  Archive
+                </button>
                 <button type="button" className={`nav-item ${active === 'admin' ? 'active' : ''}`} onClick={() => onNavigate('admin')}>
                   Admin
                 </button>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             <div className="nav-user" ref={menuRef}>
               <button
                 type="button"
@@ -82,7 +82,7 @@ export default function AppShell({ user, active, onNavigate, onLogout, onChangeP
                 <div className="nav-user-menu" role="menu">
                   <div className="nav-user-menu-header">
                     <strong>{displayName}</strong>
-                    <span className="nav-user-role">{formatRole(user?.role)}</span>
+                    <span className="nav-user-role">Role: {formatRole(user?.role)}</span>
                   </div>
                   {user?.role === 'admin' ? (
                     <button

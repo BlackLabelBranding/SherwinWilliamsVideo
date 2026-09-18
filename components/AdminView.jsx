@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { StreamList } from '@/components/LiveView';
 import { friendlyError, useModal } from '@/components/ModalProvider';
+import PasswordField from '@/components/PasswordField';
 import TrimRecordingPanel from '@/components/TrimRecordingPanel';
 import { api, fmtDate, fmtDuration } from '@/lib/client';
 
@@ -133,6 +134,13 @@ export default function AdminView({
     const formEl = event.currentTarget;
     setCreateBusy(true);
     const form = new FormData(formEl);
+    const password = String(form.get('password') || '');
+    const confirmPassword = String(form.get('confirmPassword') || '');
+    if (password !== confirmPassword) {
+      setCreateBusy(false);
+      notify({ message: 'Passwords do not match.', tone: 'error' });
+      return;
+    }
     try {
       await api(
         '/api/admin',
@@ -143,7 +151,7 @@ export default function AdminView({
             displayName: form.get('displayName'),
             username: form.get('username'),
             employeeId: form.get('employeeId'),
-            password: form.get('password'),
+            password,
             role: form.get('role')
           })
         },
@@ -188,6 +196,7 @@ export default function AdminView({
       message: 'Enter a new password (minimum 10 characters).',
       inputType: 'password',
       minLength: 10,
+      confirmPassword: true,
       confirmLabel: 'Reset password',
       loadingTitle: 'Updating password…',
       loadingMessage: 'Please wait.'
@@ -488,10 +497,16 @@ export default function AdminView({
                 <input name="employeeId" type="text" disabled={createBusy} />
               </label>
               <label>
+                Role
+                <select name="role" defaultValue="driver" disabled={createBusy}>
+                  <option value="driver">Driver</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label>
                 Password
-                <input
+                <PasswordField
                   name="password"
-                  type="password"
                   autoComplete="new-password"
                   minLength={10}
                   required
@@ -499,11 +514,14 @@ export default function AdminView({
                 />
               </label>
               <label>
-                Role
-                <select name="role" defaultValue="driver" disabled={createBusy}>
-                  <option value="driver">Driver</option>
-                  <option value="admin">Admin</option>
-                </select>
+                Confirm Password
+                <PasswordField
+                  name="confirmPassword"
+                  autoComplete="new-password"
+                  minLength={10}
+                  required
+                  disabled={createBusy}
+                />
               </label>
               <div className="form-action create-account-actions">
                 <button

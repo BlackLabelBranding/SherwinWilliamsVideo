@@ -173,6 +173,10 @@ export default function AdminView({
   }
 
   async function toggleUser(userId, activeFlag) {
+    if (activeFlag && isSelfAccount({ id: userId, username: userId })) {
+      notify({ message: 'You cannot disable your own account.', tone: 'error' });
+      return;
+    }
     try {
       setUsersLoading(true);
       await api(
@@ -188,6 +192,14 @@ export default function AdminView({
       setUsersLoading(false);
       notify({ message: friendlyError(error), tone: 'error' });
     }
+  }
+
+  function isSelfAccount(row) {
+    const selfId = String(user?.id || user?.username || '').trim().toLowerCase();
+    if (!selfId) return false;
+    const rowId = String(row.id || row.user_id || '').trim().toLowerCase();
+    if (rowId) return rowId === selfId;
+    return String(row.username || '').trim().toLowerCase() === selfId;
   }
 
   async function resetPassword(userId) {
@@ -388,7 +400,9 @@ export default function AdminView({
                     <td colSpan={7}>{users.length ? 'No matching accounts.' : 'No accounts yet.'}</td>
                   </tr>
                 ) : (
-                  pagedUsers.map((row) => (
+                  pagedUsers.map((row) => {
+                    const selfLocked = Boolean(row.active && isSelfAccount(row));
+                    return (
                     <tr key={row.id || row.username}>
                       <td>{row.display_name}</td>
                       <td>{row.username}</td>
@@ -397,14 +411,23 @@ export default function AdminView({
                       <td>{row.last_login_at ? fmtDate(row.last_login_at) : 'Never'}</td>
                       <td>{row.active ? 'Active' : 'Disabled'}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="table-action"
-                          disabled={usersLoading || createBusy}
-                          onClick={() => toggleUser(row.id || row.username, row.active)}
+                        <span
+                          className={`table-action-tip${selfLocked ? ' has-tip' : ''}`}
+                          data-tip={selfLocked ? 'You cannot disable your own account' : undefined}
                         >
-                          {row.active ? 'Disable' : 'Enable'}
-                        </button>
+                          <button
+                            type="button"
+                            className={`table-action${selfLocked ? ' is-self-locked' : ''}`}
+                            disabled={usersLoading || createBusy || selfLocked}
+                            aria-disabled={selfLocked ? 'true' : undefined}
+                            onClick={() => {
+                              if (selfLocked) return;
+                              toggleUser(row.id || row.username, row.active);
+                            }}
+                          >
+                            {row.active ? 'Disable' : 'Enable'}
+                          </button>
+                        </span>
                         <button
                           type="button"
                           className="table-action"
@@ -415,7 +438,8 @@ export default function AdminView({
                         </button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

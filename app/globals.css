@@ -180,6 +180,38 @@ select {
   font-size: 16px;
 }
 
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 46px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5f6b7a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.password-toggle:hover {
+  color: #003b78;
+  background: rgba(0, 59, 120, 0.08);
+}
+
 .portal-card input,
 .portal-card textarea,
 .portal-card select {
@@ -298,6 +330,21 @@ select:focus {
 
 .app-modal-form input {
   width: 100%;
+}
+
+.app-modal-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.app-modal-error {
+  margin: 0;
+  color: #ffb4b4;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .app-modal-actions {
@@ -540,8 +587,8 @@ select:focus {
 .nav-user-role {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: #5f6b7a;
 }
 

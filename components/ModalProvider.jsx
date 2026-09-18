@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import PasswordField from '@/components/PasswordField';
 
 const ModalContext = createContext(null);
 
@@ -12,6 +13,7 @@ function toneTitle(tone) {
 
 export function ModalProvider({ children }) {
   const [modal, setModal] = useState(null);
+  const [promptError, setPromptError] = useState('');
   const resolvePromptRef = useRef(null);
   const resolveConfirmRef = useRef(null);
   const inputRef = useRef(null);
@@ -28,12 +30,14 @@ export function ModalProvider({ children }) {
       resolveConfirmRef.current(false);
       resolveConfirmRef.current = null;
     }
+    setPromptError('');
     setModal(null);
   }, [busy]);
 
   const notify = useCallback((opts) => {
     const payload = typeof opts === 'string' ? { message: opts } : opts || {};
     const tone = payload.tone || 'error';
+    setPromptError('');
     setModal({
       mode: 'alert',
       title: payload.title || toneTitle(tone),
@@ -45,6 +49,7 @@ export function ModalProvider({ children }) {
   const prompt = useCallback((opts = {}) => {
     return new Promise((resolve) => {
       resolvePromptRef.current = resolve;
+      setPromptError('');
       setModal({
         mode: 'prompt',
         title: opts.title || 'Input required',
@@ -52,6 +57,7 @@ export function ModalProvider({ children }) {
         placeholder: opts.placeholder || '',
         inputType: opts.inputType || 'text',
         minLength: opts.minLength,
+        confirmPassword: Boolean(opts.confirmPassword),
         confirmLabel: opts.confirmLabel || 'Continue',
         loadingTitle: opts.loadingTitle || 'Updating…',
         loadingMessage: opts.loadingMessage || 'Please wait.',
@@ -90,12 +96,20 @@ export function ModalProvider({ children }) {
   function submitPrompt(event) {
     event.preventDefault();
     if (busy) return;
-    const value = String(new FormData(event.currentTarget).get('value') || '');
+    const form = new FormData(event.currentTarget);
+    const value = String(form.get('value') || '');
+    const confirmValue = String(form.get('confirmValue') || '');
     if (modal?.minLength && value.length < modal.minLength) {
+      setPromptError(`Use at least ${modal.minLength} characters.`);
+      return;
+    }
+    if (modal?.confirmPassword && value !== confirmValue) {
+      setPromptError('Passwords do not match.');
       return;
     }
     const resolve = resolvePromptRef.current;
     resolvePromptRef.current = null;
+    setPromptError('');
     // Keep modal visible — switch to loading, then caller notify()/error replaces it.
     setModal((prev) => ({
       mode: 'busy',
@@ -113,6 +127,8 @@ export function ModalProvider({ children }) {
     setModal(null);
     resolve?.(confirmed);
   }
+
+  const isPasswordPrompt = modal?.mode === 'prompt' && modal.inputType === 'password';
 
   return (
     <ModalContext.Provider value={{ notify, prompt, confirm }}>
@@ -147,16 +163,39 @@ export function ModalProvider({ children }) {
             {modal.mode === 'prompt' ? (
               <form className="app-modal-form" onSubmit={submitPrompt}>
                 <label>
-                  <span className="sr-only">{modal.title}</span>
-                  <input
-                    ref={inputRef}
-                    name="value"
-                    type={modal.inputType || 'text'}
-                    placeholder={modal.placeholder || ''}
-                    minLength={modal.minLength || undefined}
-                    required
-                  />
+                  <span className="sr-only">{modal.confirmPassword ? 'New password' : modal.title}</span>
+                  {isPasswordPrompt ? (
+                    <PasswordField
+                      inputRef={inputRef}
+                      name="value"
+                      minLength={modal.minLength || undefined}
+                      required
+                      autoComplete="new-password"
+                      placeholder={modal.placeholder || ''}
+                    />
+                  ) : (
+                    <input
+                      ref={inputRef}
+                      name="value"
+                      type={modal.inputType || 'text'}
+                      placeholder={modal.placeholder || ''}
+                      minLength={modal.minLength || undefined}
+                      required
+                    />
+                  )}
                 </label>
+                {modal.confirmPassword ? (
+                  <label>
+                    <span className="app-modal-field-label">Confirm password</span>
+                    <PasswordField
+                      name="confirmValue"
+                      minLength={modal.minLength || undefined}
+                      required
+                      autoComplete="new-password"
+                    />
+                  </label>
+                ) : null}
+                {promptError ? <div className="app-modal-error">{promptError}</div> : null}
                 <div className="app-modal-actions">
                   <button type="button" className="secondary-button" onClick={close}>
                     Cancel

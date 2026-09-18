@@ -296,6 +296,9 @@ function PortalApp() {
 
   const navigateToView = useCallback(
     async (next) => {
+      if ((next === 'archive' || next === 'admin') && user?.role !== 'admin') {
+        next = 'live';
+      }
       setChangingPassword(false);
       await endTracking();
       setView(next);
@@ -321,7 +324,7 @@ function PortalApp() {
         setContentLoading(false);
       }
     },
-    [endTracking, loadContent, token, logout]
+    [endTracking, loadContent, token, logout, user?.role]
   );
 
   async function finishPasswordChange() {
@@ -410,7 +413,7 @@ function PortalApp() {
             onPlaying={startTracking}
           />
         ) : null}
-        {view === 'archive' ? (
+        {view === 'archive' && user?.role === 'admin' ? (
           <ArchiveView
             token={token}
             media={media}

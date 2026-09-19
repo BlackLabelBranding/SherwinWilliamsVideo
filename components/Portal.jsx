@@ -61,9 +61,11 @@ function PortalApp() {
   const [bootError, setBootError] = useState('');
   const trackingRef = useRef(null);
   const heartbeatRef = useRef(null);
+  const trackingGeneration = useRef(0);
   const lastLiveIdsRef = useRef('');
 
   const endTracking = useCallback(async () => {
+    trackingGeneration.current += 1;
     if (heartbeatRef.current) {
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
@@ -72,57 +74,81 @@ function PortalApp() {
     trackingRef.current = null;
     if (!current?.sessionId || !token) return;
     try {
-      await api(
+      void api(
         '/api/metrics',
         {
           method: 'POST',
+          signal: AbortSignal.timeout(7000),
           body: JSON.stringify({
             action: 'end',
             sessionId: current.sessionId,
-            watchSeconds: Math.round((Date.now() - current.startedAt) / 1000)
+            watchSeconds: Math.floor(current.watchSeconds)
           })
         },
         token
-      );
+      ).catch(() => {});
     } catch {}
   }, [token]);
 
   const startTracking = useCallback(
     async (contentType, contentId) => {
       if (!contentId || trackingRef.current?.contentId === contentId) return;
-      await endTracking();
+      void endTracking();
+      const generation = trackingGeneration.current;
+      const current = { contentId, watchSeconds: 0, playing: true, pending: false, lastSample: Date.now(), lastSent: Date.now() };
+      trackingRef.current = current;
       try {
-        const deviceId = localStorage.getItem('sw_device_id') || crypto.randomUUID();
-        localStorage.setItem('sw_device_id', deviceId);
+        const content = contentType === 'live' ? (liveStreams.find((s) => s.id === contentId) || live) : media.find((m) => m.id === contentId);
         const result = await api(
           '/api/metrics',
           {
             method: 'POST',
-            body: JSON.stringify({ action: 'start', contentType, contentId, deviceId })
+            signal: AbortSignal.timeout(7000),
+            body: JSON.stringify({ action: 'start', contentType, contentId, contentTitle: content?.title, broadcastStarted: content?.started_at })
           },
           token
         );
-        trackingRef.current = { sessionId: result.sessionId, contentId, startedAt: Date.now() };
+        if (generation !== trackingGeneration.current) return;
+        current.sessionId = result.sessionId;
         heartbeatRef.current = setInterval(async () => {
-          if (!trackingRef.current) return;
+          if (trackingRef.current !== current) return;
+          const now = Date.now();
+          const element = [...document.querySelectorAll('video, audio')].find((el) => !el.paused && !el.ended && el.readyState >= 3);
+          current.playing = Boolean(element && element.currentTime !== current.lastPosition);
+          if (current.playing) current.watchSeconds += Math.min(2, (now - current.lastSample) / 1000);
+          if (element) current.lastPosition = element.currentTime;
+          current.lastSample = now;
+          if (current.pending || now - current.lastSent < 15000) return;
+          current.pending = true;
+          current.lastSent = now;
           try {
             await api(
               '/api/metrics',
               {
                 method: 'POST',
+                signal: AbortSignal.timeout(7000),
                 body: JSON.stringify({
                   action: 'heartbeat',
-                  sessionId: trackingRef.current.sessionId,
-                  watchSeconds: Math.round((Date.now() - trackingRef.current.startedAt) / 1000)
+                  sessionId: current.sessionId,
+                  watchSeconds: Math.floor(current.watchSeconds),
+                  playing: current.playing
                 })
               },
               token
             );
-          } catch {}
-        }, 15000);
-      } catch {}
+          } catch {} finally { current.pending = false; }
+        }, 1000);
+      } catch {
+        if (trackingRef.current === current) {
+          trackingRef.current = null;
+          heartbeatRef.current = setTimeout(() => {
+            const playing = [...document.querySelectorAll('video, audio')].some((el) => !el.paused && !el.ended);
+            if (playing && generation === trackingGeneration.current) void startTracking(contentType, contentId);
+          }, 15000);
+        }
+      }
     },
-    [endTracking, token]
+    [endTracking, token, liveStreams, live, media]
   );
 
   const loadContent = useCallback(
@@ -211,13 +237,13 @@ function PortalApp() {
       const payload = JSON.stringify({
         action: 'end',
         sessionId: trackingRef.current.sessionId,
-        watchSeconds: Math.round((Date.now() - trackingRef.current.startedAt) / 1000)
+        watchSeconds: Math.floor(trackingRef.current.watchSeconds)
       });
-      navigator.sendBeacon?.('/api/metrics', new Blob([payload], { type: 'application/json' }));
+      void fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: payload, keepalive: true }).catch(() => {});
     };
-    window.addEventListener('beforeunload', onUnload);
-    return () => window.removeEventListener('beforeunload', onUnload);
-  }, []);
+    window.addEventListener('pagehide', onUnload);
+    return () => window.removeEventListener('pagehide', onUnload);
+  }, [token]);
 
   async function handleLogin(result) {
     setToken(result.token);

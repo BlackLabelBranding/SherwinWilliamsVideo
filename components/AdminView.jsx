@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { StreamList } from '@/components/LiveView';
 import { friendlyError, useModal } from '@/components/ModalProvider';
 import PasswordField from '@/components/PasswordField';
 import TrimRecordingPanel from '@/components/TrimRecordingPanel';
 import { api, fmtDate, fmtDuration } from '@/lib/client';
+import { attendanceCsv } from '@/lib/attendance-csv';
 
 const DRIVERS_PAGE_SIZE = 10;
 
@@ -36,6 +37,9 @@ export default function AdminView({
   const [users, setUsers] = useState([]);
   const [metrics, setMetrics] = useState({ live: {}, active: [] });
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [reportDate, setReportDate] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()));
+  const [exporting, setExporting] = useState(false);
+  const reportRequest = useRef(0);
   const [createBusy, setCreateBusy] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -91,19 +95,19 @@ export default function AdminView({
   }
 
   async function loadMetrics({ showLoading = false } = {}) {
+    const requestId = ++reportRequest.current;
     if (showLoading) setMetricsLoading(true);
     const started = Date.now();
     try {
       const result = await api(
         '/api/metrics',
-        { method: 'POST', body: JSON.stringify({ action: 'dashboard' }) },
+        { method: 'POST', signal: AbortSignal.timeout(20000), body: JSON.stringify({ action: 'dashboard', date: reportDate }) },
         token
       );
-      const row =
-        (result.live || []).find((r) => r.id === live?.id) || result.live?.[0] || {};
-      setMetrics({ live: row, active: result.active || [] });
+      if (requestId === reportRequest.current) setMetrics({ live: result, active: result.active || [], sessions: result.sessions || [] });
+      return result;
     } catch (error) {
-      setMetrics({ live: { error: error.message }, active: [] });
+      if (requestId === reportRequest.current) setMetrics({ live: { error: error.message }, active: [], sessions: [] });
     } finally {
       if (showLoading) {
         const wait = 450 - (Date.now() - started);
@@ -113,17 +117,39 @@ export default function AdminView({
     }
   }
 
+  async function exportAttendance() {
+    setExporting(true);
+    try {
+      const result = await loadMetrics({ showLoading: true });
+      if (!result) return;
+      const url = URL.createObjectURL(new Blob([attendanceCsv(result.sessions)], { type: 'text/csv;charset=utf-8;' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `driver-attendance-${reportDate}-Central.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } finally { setExporting(false); }
+  }
+
   useEffect(() => {
     if (user?.role !== 'admin') return undefined;
     loadAdmin({ showLoading: true }).catch((error) => {
       setUsersLoading(false);
       notify({ message: friendlyError(error), tone: 'error' });
     });
-    loadMetrics();
-    const timer = setInterval(loadMetrics, 10000);
-    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'admin' || !reportDate) return undefined;
+    setMetrics({ live: {}, active: [], sessions: [] });
+    loadMetrics({ showLoading: true });
+    const timer = setInterval(loadMetrics, 10000);
+    return () => { clearInterval(timer); reportRequest.current += 1; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.role, reportDate]);
 
   useEffect(() => {
     setUserPage(1);
@@ -288,8 +314,15 @@ export default function AdminView({
         <div className="admin-section-title">
           <div>
             <h3>Real-Time Analytics</h3>
-            <p>Updates every 10 seconds from driver viewing sessions.</p>
+            <p>Driver sessions started on the selected Chicago date. Updates every 10 seconds. Playback time is estimated, not proof of attention.</p>
           </div>
+          <label>
+            Report date (Central)
+            <input type="date" value={reportDate} disabled={metricsLoading || exporting} onChange={(event) => { if (event.target.value) setReportDate(event.target.value); }} />
+          </label>
+          <button type="button" className="secondary-button" onClick={exportAttendance} disabled={exporting || metricsLoading}>
+            {exporting ? 'Exporting…' : 'Export Driver Log'}
+          </button>
           <button
             type="button"
             className="secondary-button"
@@ -312,7 +345,7 @@ export default function AdminView({
             ) : (
               <>
                 <MetricCard value={liveMetrics.current_viewers || 0} label="Watching Now" />
-                <MetricCard value={liveMetrics.peak_viewers || 0} label="Peak Viewers" />
+                <MetricCard value={liveMetrics.session_count || 0} label="Viewing Sessions" />
                 <MetricCard value={liveMetrics.unique_viewers || 0} label="Unique Drivers" />
                 <MetricCard value={fmtDuration(liveMetrics.total_watch_seconds || 0)} label="Total Watch Time" />
               </>
@@ -325,22 +358,22 @@ export default function AdminView({
                   <th>Driver</th>
                   <th>Content</th>
                   <th>Watch Time</th>
-                  <th>Last Heartbeat</th>
+                  <th>Last Heartbeat (Central)</th>
                 </tr>
               </thead>
               <tbody>
-                {metrics.active?.length ? (
-                  metrics.active.map((row) => (
+                {metrics.sessions?.length ? (
+                  metrics.sessions.map((row) => (
                     <tr key={row.sessionId || `${row.user_id}-${row.content_type}`}>
                       <td>{row.user?.display_name || row.user?.username || 'Driver'}</td>
-                      <td>{row.content_type}</td>
+                      <td>{row.content_title || row.content_type} · {row.content_type}</td>
                       <td>{fmtDuration(row.watch_seconds)}</td>
                       <td>{fmtDate(row.last_heartbeat_at)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4}>No active viewers.</td>
+                    <td colSpan={4}>{liveMetrics.error ? 'Report unavailable.' : 'No recorded driver sessions for this date.'}</td>
                   </tr>
                 )}
               </tbody>

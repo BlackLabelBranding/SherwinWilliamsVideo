@@ -30,26 +30,36 @@ function patchIvsPlayerPlay(player) {
 }
 
 function waitFor(check, timeoutMs = 15000) {
-  return new Promise((resolve) => {
-    if (check()) {
-      resolve(true);
-      return;
-    }
+  return new Promise((resolve, reject) => {
     const started = Date.now();
-    const timer = setInterval(() => {
-      if (check()) {
+    let timer;
+    const poll = () => {
+      try {
+        if (check()) {
+          clearInterval(timer);
+          resolve(true);
+          return true;
+        }
+        if (Date.now() - started >= timeoutMs) {
+          clearInterval(timer);
+          resolve(false);
+          return true;
+        }
+      } catch (error) {
         clearInterval(timer);
-        resolve(true);
-      } else if (Date.now() - started >= timeoutMs) {
-        clearInterval(timer);
-        resolve(false);
+        reject(error);
+        return true;
       }
-    }, 80);
+      return false;
+    };
+    if (!poll()) timer = setInterval(poll, 80);
   });
 }
 
 function waitForIvsPlayer() {
-  return waitFor(() => Boolean(window.IVSPlayer?.isPlayerSupported?.()));
+  // SDK readiness and browser support are separate. isPlayerSupported is a
+  // BOOLEAN, not a function; calling it prevents every IVS stream from loading.
+  return waitFor(() => typeof window.IVSPlayer?.create === 'function');
 }
 
 function waitForHls() {
@@ -155,17 +165,24 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
   const shellRef = useRef(null);
   const ref = useRef(null);
   const onDurationRef = useRef(onDuration);
+  const onPlayingRef = useRef(onPlaying);
   const lastReportedDurationRef = useRef(0);
   const [customControls, setCustomControls] = useState(isArchiveHls);
   const [playing, setPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(muted);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [needsUserPlay, setNeedsUserPlay] = useState(false);
+  const [playbackError, setPlaybackError] = useState('');
+  const [retryVersion, setRetryVersion] = useState(0);
   const isLive = contentType === 'live';
 
   useEffect(() => {
     onDurationRef.current = onDuration;
   }, [onDuration]);
+
+  useEffect(() => {
+    onPlayingRef.current = onPlaying;
+  }, [onPlaying]);
 
   useEffect(() => {
     setIsMuted(muted);
@@ -179,7 +196,8 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       else safePlay(() => element.play());
       setNeedsUserPlay(false);
     } else {
-      element.pause();
+      if (element._ivsPlayer) element._ivsPlayer.pause();
+      else element.pause();
     }
   }, []);
 
@@ -187,6 +205,7 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     const element = ref.current;
     if (!element) return;
     const next = !element.muted;
+    element._ivsPlayer?.setMuted(next);
     element.muted = next;
     setIsMuted(next);
   }, []);
@@ -222,12 +241,23 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     setPlaying(false);
     setProgress({ current: 0, total: 0 });
     setNeedsUserPlay(false);
+    setPlaybackError('');
 
     let cancelled = false;
+    let userPlayTimer;
+
+    const showPlaybackError = (message) => {
+      if (cancelled) return;
+      clearTimeout(userPlayTimer);
+      setPlaying(false);
+      setNeedsUserPlay(false);
+      setPlaybackError(message);
+    };
 
     const markNeedsUserPlay = () => {
       if (cancelled || !isLive) return;
-      window.setTimeout(() => {
+      clearTimeout(userPlayTimer);
+      userPlayTimer = window.setTimeout(() => {
         if (!cancelled && element.paused) setNeedsUserPlay(true);
       }, 600);
     };
@@ -273,7 +303,14 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
     const onVolumeChange = () => setIsMuted(element.muted);
 
     destroyPlayers(element);
-    const begin = () => onPlaying?.(contentType, contentId);
+    const begin = () => {
+      setPlaybackError('');
+      onPlayingRef.current?.(contentType, contentId);
+    };
+    const onMediaError = () => {
+      if (isLive) showPlaybackError('The live stream could not be loaded. Select Retry to reconnect.');
+    };
+    element.addEventListener('error', onMediaError);
     element.addEventListener('playing', begin, { once: true });
     element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPause);
@@ -354,19 +391,37 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       const ivsReady = await waitForIvsPlayer();
       if (cancelled) return;
 
-      if (ivsReady && window.IVSPlayer?.isPlayerSupported?.()) {
+      if (ivsReady && window.IVSPlayer.isPlayerSupported === true) {
         const player = window.IVSPlayer.create();
+        // Retain immediately so cleanup also works if attachment/load throws.
+        element._ivsPlayer = player;
         patchIvsPlayerPlay(player);
+        const events = window.IVSPlayer.PlayerEventType;
+        if (events?.ERROR) {
+          player.addEventListener(events.ERROR, (error) => {
+            if (cancelled) return;
+            console.error('[Sherwin Safety] IVS playback error', {
+              code: error?.code, type: error?.type, source: error?.source
+            });
+            const code = Number.isFinite(error?.code) ? ` (code ${error.code})` : '';
+            showPlaybackError(`The live stream could not be played${code}. Select Retry to reconnect.`);
+          });
+        }
+        const playbackBlocked = () => {
+          if (!cancelled) setNeedsUserPlay(true);
+        };
+        if (events?.PLAYBACK_BLOCKED) player.addEventListener(events.PLAYBACK_BLOCKED, playbackBlocked);
+        if (events?.AUDIO_BLOCKED) player.addEventListener(events.AUDIO_BLOCKED, playbackBlocked);
         if (isMobileDevice()) player.setLiveLowLatencyEnabled?.(false);
         else player.setLiveLowLatencyEnabled?.(true);
         player.attachHTMLVideoElement(element);
+        player.setMuted(muted);
         element.muted = muted;
         setIsMuted(muted);
         element.setAttribute('playsinline', '');
         element.setAttribute('webkit-playsinline', '');
         player.load(absoluteUrl);
         safePlay(() => player.play());
-        element._ivsPlayer = player;
         markNeedsUserPlay();
         return;
       }
@@ -378,15 +433,28 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
         element.load();
         safePlay(() => element.play());
         markNeedsUserPlay();
+        return;
       }
+
+      showPlaybackError(
+        ivsReady
+          ? 'This browser does not support live playback. Try an updated browser.'
+          : 'The video player could not load. Check your connection and select Retry.'
+      );
     }
 
-    setupPlayer().catch(() => {
-      if (!cancelled && isLive) setNeedsUserPlay(true);
+    setupPlayer().catch((error) => {
+      if (cancelled) return;
+      console.error('[Sherwin Safety] Player initialization failed', error);
+      destroyPlayers(element);
+      showPlaybackError('The video player could not start. Select Retry to reconnect.');
     });
 
     return () => {
       cancelled = true;
+      clearTimeout(userPlayTimer);
+      element.removeEventListener('error', onMediaError);
+      element.removeEventListener('playing', begin);
       element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPause);
       element.removeEventListener('volumechange', onVolumeChange);
@@ -397,8 +465,11 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
       element.removeEventListener('seeking', onTimeUpdate);
       element.removeEventListener('seeked', onTimeUpdate);
       destroyPlayers(element);
+      element.pause();
+      element.removeAttribute('src');
+      element.load();
     };
-  }, [url, playbackUrl, contentType, contentId, muted, onPlaying, isArchiveHls, isLive]);
+  }, [url, playbackUrl, contentType, contentId, muted, isArchiveHls, isLive, retryVersion]);
 
   const seekPct = progress.total ? Math.min(100, (progress.current / progress.total) * 100) : 0;
   const showCustomControls = customControls;
@@ -424,7 +495,26 @@ export default function VideoPlayer({ url, contentType, contentId, muted = false
         preload="metadata"
         autoPlay={isLive && muted}
       />
-      {needsUserPlay ? (
+      {playbackError ? (
+        <div
+          className="video-playback-error"
+          style={{
+            position: 'absolute', inset: 0, zIndex: 5, display: 'grid',
+            placeContent: 'center', gap: '0.75rem', padding: '1.25rem',
+            textAlign: 'center', background: 'rgba(0, 14, 30, 0.94)', color: '#fff'
+          }}
+        >
+          <p role="alert">{playbackError}</p>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => setRetryVersion((version) => version + 1)}
+          >
+            Retry playback
+          </button>
+        </div>
+      ) : null}
+      {needsUserPlay && !playbackError ? (
         <button type="button" className="video-tap-play" aria-label="Tap to play live stream" onClick={togglePlay}>
           <span className="video-tap-play-icon" aria-hidden="true">
             ▶

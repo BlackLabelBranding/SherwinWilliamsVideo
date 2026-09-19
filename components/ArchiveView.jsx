@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { friendlyError, useModal } from '@/components/ModalProvider';
-import { api, fmtDate, withCacheBust } from '@/lib/client';
+import { api, fmtDate, fmtDateOnly, withCacheBust } from '@/lib/client';
 
 export default function ArchiveView({ token, media, mediaVersions = {}, onPlaying, isAdmin = false, onMediaChange }) {
   const { notify, confirm } = useModal();
@@ -202,7 +202,7 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
                 <strong>{item.title}</strong>
                 <span>
                   {item.media_type === 'audio' ? 'Audio' : 'Video'} ·{' '}
-                  {new Date(item.recorded_at).toLocaleDateString()}
+                  {fmtDateOnly(item.recorded_at)}
                 </span>
               </button>
             ))
@@ -260,7 +260,7 @@ export default function ArchiveView({ token, media, mediaVersions = {}, onPlayin
                   </div>
                 </div>
                 <h2>{selected.title}</h2>
-                <p>{new Date(selected.recorded_at).toLocaleDateString()}</p>
+                <p>{fmtDateOnly(selected.recorded_at)}</p>
               </div>
             </div>
             {selected.description ? <p className="media-description">{selected.description}</p> : null}
